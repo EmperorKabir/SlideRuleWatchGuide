@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- All elements within the 66dp safe zone (radius 33 from center 54,54). -->
+    <!-- Outer ring -->
+    <path
+        android:strokeColor="#F0EFEA"
+        android:strokeWidth="2.4"
+        android:pathData="M54,54m-30,0a30,30 0 1,0 60,0a30,30 0 1,0 -60,0" />
+    <!-- Inner ring -->
+    <path
+        android:strokeColor="#F0EFEA"
+        android:strokeWidth="1.6"
+        android:pathData="M54,54m-22,0a22,22 0 1,0 44,0a22,22 0 1,0 -44,0" />
+    <!-- 12 short tick marks every 30 degrees (between rings) -->
+    <path
+        android:strokeColor="#F0EFEA"
+        android:strokeWidth="1.4"
+        android:pathData="
+            M54,25 L54,28
+            M54,80 L54,83
+            M25,54 L28,54
+            M80,54 L83,54
+            M34,34 L36,36
+            M72,34 L74,36 M72,72 L74,74 M34,72 L36,74
+            M40,28 L41,31 M68,28 L67,31
+            M40,80 L41,77 M68,80 L67,77
+            M28,40 L31,41 M28,68 L31,67
+            M80,40 L77,41 M80,68 L77,67" />
+    <!-- Red triangle index at 12 o'clock pointing inward -->
+    <path
+        android:fillColor="#D7263D"
+        android:pathData="M54,22 L50,30 L58,30 Z" />
+</vector>

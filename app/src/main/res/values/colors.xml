@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#0E5638</color>
+    <color name="dial_green">#0E5638</color>
+    <color name="dial_dark">#021A11</color>
+    <color name="bezel_white">#F0EFEA</color>
+    <color name="accent_red">#D7263D</color>
+</resources>

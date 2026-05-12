@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Slide Rule Watch Guide</string>
+
+    <string name="header_division">Division</string>
+    <string name="header_multiplication">Multiplication</string>
+    <string name="header_speed_time_distance">Speed / Time / Distance</string>
+    <string name="header_stat_km">Statute miles &#8596; Kilometres</string>
+    <string name="header_naut_km">Nautical miles &#8596; Kilometres</string>
+    <string name="header_time_units">Time units (60 / 36)</string>
+    <string name="header_extras">Extras: fuel, rate, currency, percentage</string>
+
+    <string name="control_step">&#177; step</string>
+    <string name="control_align">Align outer X to inner Y</string>
+    <string name="control_align_outer_x">Outer X</string>
+    <string name="control_align_inner_y">Inner Y</string>
+    <string name="control_snap">Snap</string>
+    <string name="control_reset">Reset</string>
+    <string name="control_rotation">Bezel rotation</string>
+</resources>
