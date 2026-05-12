@@ -214,12 +214,26 @@ private fun DialColumn(
             val safetyGapDp = 12f * density.fontScale.coerceAtLeast(1f)
             fun overlapFor(w: Float, h: Float): Float {
                 if (w == 0f || h == 0f) return 0f
-                val dx = side.value / 2f - w
-                val dy = side.value / 2f - h
-                val cornerDist = kotlin.math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                // Treat the dial radius as if it were larger by safetyGap;
-                // the box has to clear that inflated circle.
-                return (rOuter + safetyGapDp - cornerDist).coerceAtLeast(0f)
+                // Box anchored to BottomStart/BottomEnd of a container of
+                // height (side + overlap). The closest point of the box to
+                // the dial centre (side/2, side/2) is:
+                //   x_c = clamp(side/2, 0, w)            → dx = max(0, side/2 - w)
+                //   y_c = side + overlap - h             (the top edge)
+                // We need sqrt(dx² + dy²) ≥ rOuter + safetyGap where
+                //   dy = (side + overlap - h) - side/2 = overlap + h - side/2.
+                // Solving for overlap so dy = √(safety² - dx²):
+                //   overlap = √(safety² - dx²) + h - side/2.
+                // When the box is wider than half the dial, dx clamps to 0
+                // and the box has to be pushed below the safety circle's
+                // lowest point — exactly the case that the old corner-
+                // distance heuristic underestimated.
+                val safety = rOuter + safetyGapDp
+                val dxClamped = maxOf(0f, side.value / 2f - w)
+                val termInside = safety * safety - dxClamped * dxClamped
+                if (termInside <= 0f) return 0f
+                val dyNeeded = kotlin.math.sqrt(termInside.toDouble()).toFloat()
+                val needed = dyNeeded + h - side.value / 2f
+                return needed.coerceAtLeast(0f)
             }
             val overlap = maxOf(
                 overlapFor(bezelDp.first, bezelDp.second),

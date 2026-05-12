@@ -60,11 +60,15 @@ import kotlin.math.sin
  *                         counters. Driven by the system clock and the
  *                         chronograph state.
  */
-/** Hard ceiling on the system font-scale used for the dial face. The
- *  bezel numerals still respond to Android's text-size accessibility
- *  setting, but only up to this multiplier. Past that the ring would
- *  overflow into the dial. */
-private const val DIAL_FONT_SCALE_CEILING: Float = 1.15f
+/** Hard ceiling on the system font-scale used for the dial face. Set to
+ *  1.0 so the dial is completely invariant to Android's text-size
+ *  accessibility setting: bezel numerals, chapter-ring numerals and
+ *  brand stack render at their design size regardless of fontScale.
+ *  At fontScale ≤ 1.0 there is no behavioural change; at fontScale > 1.0
+ *  the dial is held at its design pixel size while text OUTSIDE the
+ *  dial scope (equations panel, input boxes, presets) continues to
+ *  respect the user's accessibility preference. */
+private const val DIAL_FONT_SCALE_CEILING: Float = 1.0f
 
 @Composable
 fun WatchDial(
