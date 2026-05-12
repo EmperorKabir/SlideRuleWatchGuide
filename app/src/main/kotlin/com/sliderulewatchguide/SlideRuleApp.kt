@@ -59,7 +59,11 @@ fun SlideRuleApp() {
     // overlay z-stacked OVER the main content. Underlying layout stays
     // in place regardless of disclaimer visibility — dismissing the
     // overlay does not shift the watch or the equations panel at all.
-    var disclaimerExpanded by remember { mutableStateOf(true) }
+    // rememberSaveable so the dismissed state survives config changes
+    // (fold / unfold, rotation, font-scale change).
+    var disclaimerExpanded by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf(true)
+    }
 
     Scaffold { innerPadding ->
         Box(
@@ -76,69 +80,18 @@ fun SlideRuleApp() {
             // recomposition triggered by font-scale / rotation changes.
             val equationsScroll = rememberScrollState()
             if (isWide) {
-                Row(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-                    DialColumn(
-                        modifier = Modifier.weight(1f),
-                        isWide = true,
-                        rotation = rotation,
-                        chronoState = chronoState,
-                        chronoMillisProvider = vm::currentChronoMs,
-                        outerText = outerText,
-                        innerText = innerText,
-                        statText = statText,
-                        nautText = nautText,
-                        kmText = kmText,
-                        vm = vm
-                    )
-                    Spacer(Modifier.size(12.dp))
-                    // Right column: input panels on top (their own Row),
-                    // live equations below in a scrollable sub-column.
-                    // The dial column on the left stays full-size at any
-                    // font scale because its sizing no longer depends
-                    // on the input panels' heights.
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            BezelInputs(
-                                outer = outerText,
-                                inner = innerText,
-                                onOuterChange = vm::setOuterText,
-                                onInnerChange = vm::setInnerText,
-                                onCommit = vm::commitInputs
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            ConverterInputs(
-                                stat = statText,
-                                naut = nautText,
-                                km = kmText,
-                                onStatChange = vm::setStatText,
-                                onNautChange = vm::setNautText,
-                                onKmChange = vm::setKmText,
-                                onCommitStat = vm::commitStat,
-                                onCommitNaut = vm::commitNaut,
-                                onCommitKm = vm::commitKm
-                            )
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .verticalScroll(equationsScroll),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            FloatingEquations(
-                                rotationDegrees = rotation,
-                                outer = outerText,
-                                inner = innerText,
-                                statRead = statText,
-                                nautRead = nautText,
-                                kmRead = kmText
-                            )
-                        }
-                    }
-                }
+                WideLayout(
+                    rotation = rotation,
+                    chronoState = chronoState,
+                    chronoMillisProvider = vm::currentChronoMs,
+                    outerText = outerText,
+                    innerText = innerText,
+                    statText = statText,
+                    nautText = nautText,
+                    kmText = kmText,
+                    equationsScroll = equationsScroll,
+                    vm = vm
+                )
             } else {
                 // Compact / portrait: dial + buttons stay anchored at the
                 // top; the live equations panel is its own bounded scroll
@@ -153,7 +106,6 @@ fun SlideRuleApp() {
                 ) {
                     DialColumn(
                         modifier = Modifier.fillMaxWidth(),
-                        isWide = false,
                         rotation = rotation,
                         chronoState = chronoState,
                         chronoMillisProvider = vm::currentChronoMs,
@@ -195,10 +147,14 @@ fun SlideRuleApp() {
     }
 }
 
+/**
+ * Portrait / compact-width dial column: presets + dial-with-corner-inputs.
+ * The dial + inputs use a SubcomposeLayout that guarantees the inputs
+ * never overlap the dial by construction.
+ */
 @Composable
 private fun DialColumn(
     modifier: Modifier,
-    isWide: Boolean,
     rotation: Double,
     chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
     chronoMillisProvider: () -> Long,
@@ -209,92 +165,174 @@ private fun DialColumn(
     kmText: String,
     vm: DialViewModel
 ) {
-    // Disclaimer is now rendered as an overlay at the SlideRuleApp top
-    // level (sibling of this column). DialColumn no longer participates
-    // in disclaimer state — the underlying layout is stable regardless
-    // of the overlay's visibility.
-
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        // Reset (left, on its own) + Examples arc (right) above the watch.
         CurvedPresets(
             onSetAngle = vm::setRotation,
             onReset = vm::reset,
-            // Tall enough to fit the steeper chip arc (centre chip up
-            // top, outer chips ~44 dp lower) plus the EXAMPLES caption.
             modifier = Modifier.fillMaxWidth().height(96.dp)
         )
 
-        val bezelInputs: @Composable () -> Unit = {
-            BezelInputs(
-                outer = outerText,
-                inner = innerText,
-                onOuterChange = vm::setOuterText,
-                onInnerChange = vm::setInnerText,
-                onCommit = vm::commitInputs
-            )
-        }
-        val converterInputs: @Composable () -> Unit = {
-            ConverterInputs(
-                stat = statText,
-                naut = nautText,
-                km = kmText,
-                onStatChange = vm::setStatText,
-                onNautChange = vm::setNautText,
-                onKmChange = vm::setKmText,
-                onCommitStat = vm::commitStat,
-                onCommitNaut = vm::commitNaut,
-                onCommitKm = vm::commitKm
-            )
-        }
-
-        if (isWide) {
-            // Tablet / wide canvas: dial fills the dial column width at
-            // its full square aspect ratio. The input panels are NOT
-            // drawn in this column — they have been moved to the top of
-            // the equations column (sibling Row in the parent) so the
-            // dial's size never depends on input heights and never
-            // shrinks at any font scale.
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val side = maxWidth
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .bezelDragRotation { vm.rotateBy(it) }
-                ) {
-                    DialWithPushers(
-                        side = side,
-                        rotation = rotation,
-                        chronoState = chronoState,
-                        chronoMillisProvider = chronoMillisProvider,
-                        onChronoStartStop = vm::chronoStartStop,
-                        onChronoReset = vm::chronoReset
-                    )
-                }
+        DialWithCornerInputs(
+            rotation = rotation,
+            chronoState = chronoState,
+            chronoMillisProvider = chronoMillisProvider,
+            onBezelDrag = vm::rotateBy,
+            onChronoStartStop = vm::chronoStartStop,
+            onChronoReset = vm::chronoReset,
+            bezelInputs = {
+                BezelInputs(
+                    outer = outerText,
+                    inner = innerText,
+                    onOuterChange = vm::setOuterText,
+                    onInnerChange = vm::setInnerText,
+                    onCommit = vm::commitInputs
+                )
+            },
+            converterInputs = {
+                ConverterInputs(
+                    stat = statText,
+                    naut = nautText,
+                    km = kmText,
+                    onStatChange = vm::setStatText,
+                    onNautChange = vm::setNautText,
+                    onKmChange = vm::setKmText,
+                    onCommitStat = vm::commitStat,
+                    onCommitNaut = vm::commitNaut,
+                    onCommitKm = vm::commitKm
+                )
             }
-        } else {
-            // Compact / portrait: SubcomposeLayout measures the input
-            // panels FIRST, derives a container height that guarantees
-            // the panels' inner corners sit outside the dial's safety
-            // circle by construction, then composes the dial at that
-            // size. Single pass — no reactive feedback, no first-frame
-            // flash where overlap would otherwise be zero. At fontScale
-            // 1.0 on a typical phone the input panels are small enough
-            // that the computed container height equals the dial's
-            // natural square size, so the visual result is identical
-            // to the previous reactive-state implementation. At higher
-            // font scales the container grows JUST enough to clear the
-            // safety circle, and never less.
-            DialWithCornerInputs(
-                rotation = rotation,
-                chronoState = chronoState,
-                chronoMillisProvider = chronoMillisProvider,
-                onBezelDrag = vm::rotateBy,
-                onChronoStartStop = vm::chronoStartStop,
-                onChronoReset = vm::chronoReset,
-                bezelInputs = bezelInputs,
-                converterInputs = converterInputs
+        )
+    }
+}
+
+/**
+ * Tablet / wide-canvas layout (single-pass SubcomposeLayout). Measures
+ * the presets, dial, input panels and equations panel up-front, then
+ * decides at layout time whether the inputs Row sits BELOW the dial in
+ * the left column (preferred when there's enough vertical room — e.g.
+ * Fold 7 unfolded at fontScale 1.0) or moves to the TOP of the right
+ * (equations) column when the left column would otherwise overflow.
+ *
+ * Robust under:
+ *   - foldable open / close (recomposes on parent maxWidth/maxHeight change)
+ *   - system fontScale change (re-measures inputs at new sizes; the
+ *     placement decision re-evaluates accordingly)
+ *   - configuration changes (subcompose slot IDs are stable strings;
+ *     ViewModel + rememberScrollState survive across recomposition)
+ */
+@Composable
+private fun WideLayout(
+    rotation: Double,
+    chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
+    chronoMillisProvider: () -> Long,
+    outerText: String,
+    innerText: String,
+    statText: String,
+    nautText: String,
+    kmText: String,
+    equationsScroll: androidx.compose.foundation.ScrollState,
+    vm: DialViewModel
+) {
+    SubcomposeLayout(modifier = Modifier.fillMaxSize().padding(12.dp)) { constraints ->
+        val totalW = constraints.maxWidth
+        val totalH = constraints.maxHeight
+        val spacerPx = 12.dp.roundToPx()
+        val colW = ((totalW - spacerPx) / 2).coerceAtLeast(0)
+        val presetsHpx = 96.dp.roundToPx()
+        val dialBelowGapPx = 8.dp.roundToPx()
+        val inputsBelowMarginPx = 8.dp.roundToPx()
+        val rightColInputsGapPx = 10.dp.roundToPx()
+
+        val presetsP = subcompose("presets") {
+            CurvedPresets(
+                onSetAngle = vm::setRotation,
+                onReset = vm::reset,
+                modifier = Modifier.fillMaxWidth().height(96.dp)
             )
+        }.first().measure(Constraints(maxWidth = colW, maxHeight = presetsHpx))
+
+        val dialSize = colW
+        val dialP = subcompose("dial") {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .bezelDragRotation { vm.rotateBy(it) }
+            ) {
+                DialWithPushers(
+                    side = dialSize.toDp(),
+                    rotation = rotation,
+                    chronoState = chronoState,
+                    chronoMillisProvider = chronoMillisProvider,
+                    onChronoStartStop = vm::chronoStartStop,
+                    onChronoReset = vm::chronoReset
+                )
+            }
+        }.first().measure(Constraints.fixed(dialSize, dialSize))
+
+        val inputsP = subcompose("inputs") {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
+            ) {
+                BezelInputs(
+                    outer = outerText,
+                    inner = innerText,
+                    onOuterChange = vm::setOuterText,
+                    onInnerChange = vm::setInnerText,
+                    onCommit = vm::commitInputs
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                ConverterInputs(
+                    stat = statText,
+                    naut = nautText,
+                    km = kmText,
+                    onStatChange = vm::setStatText,
+                    onNautChange = vm::setNautText,
+                    onKmChange = vm::setKmText,
+                    onCommitStat = vm::commitStat,
+                    onCommitNaut = vm::commitNaut,
+                    onCommitKm = vm::commitKm
+                )
+            }
+        }.first().measure(Constraints(maxWidth = colW))
+
+        val leftStackH = presetsP.height + dialP.height + dialBelowGapPx +
+            inputsP.height + inputsBelowMarginPx
+        val inputsBelowDial = leftStackH <= totalH
+
+        val rightTopUsed = if (inputsBelowDial) 0 else inputsP.height + rightColInputsGapPx
+        val eqMaxH = (totalH - rightTopUsed).coerceAtLeast(0)
+        val equationsP = subcompose("equations") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(equationsScroll),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                FloatingEquations(
+                    rotationDegrees = rotation,
+                    outer = outerText,
+                    inner = innerText,
+                    statRead = statText,
+                    nautRead = nautText,
+                    kmRead = kmText
+                )
+            }
+        }.first().measure(Constraints(maxWidth = colW, maxHeight = eqMaxH))
+
+        layout(totalW, totalH) {
+            presetsP.placeRelative(0, 0)
+            dialP.placeRelative(0, presetsP.height)
+            if (inputsBelowDial) {
+                inputsP.placeRelative(0, presetsP.height + dialP.height + dialBelowGapPx)
+            }
+            val rightX = colW + spacerPx
+            if (inputsBelowDial) {
+                equationsP.placeRelative(rightX, 0)
+            } else {
+                inputsP.placeRelative(rightX, 0)
+                equationsP.placeRelative(rightX, inputsP.height + rightColInputsGapPx)
+            }
         }
     }
 }
