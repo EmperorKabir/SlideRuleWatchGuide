@@ -366,13 +366,12 @@ private fun DrawScope.drawCoinEdgeBaseplate(g: DialGeom) {
     drawCircle(color = DialPalette.SteelLight, radius = g.rOuter, center = g.center, style = Stroke(width = 1.2f))
     drawCircle(color = DialPalette.BezelEdgeShadow, radius = rBase, center = g.center,
         style = Stroke(width = g.rOuter * 0.008f))
-    // Thin black perimeter border — gives the chrome rim a clear edge
-    // against light-mode backgrounds (where the silver teeth previously
-    // bled into white). Drawn UNDER the crown / pushers, so those tabs
-    // visually break the border at 2 and 4 o'clock instead of running
-    // straight through them.
+    // Black perimeter border — doubled in thickness from the original
+    // 0.012 r so it reads as a deliberate frame rather than a hairline.
+    // Drawn UNDER the crown / pushers, so those tabs visually break the
+    // border at 2 and 4 o'clock instead of running straight through.
     drawCircle(color = Color.Black, radius = g.rOuter, center = g.center,
-        style = Stroke(width = g.rOuter * 0.012f))
+        style = Stroke(width = g.rOuter * 0.024f))
 }
 
 private fun DrawScope.drawBezelInsertRecess(g: DialGeom) {
@@ -576,6 +575,10 @@ private fun DrawScope.drawFixedChapterRing(g: DialGeom, measurer: TextMeasurer) 
                 )
             }
             m.text?.let { txt ->
+                // Sta and Nau render 30 % larger than the other red-text
+                // markers (KM); they're the conversion-anchor labels and
+                // the user wants them more prominent.
+                val sizeFactor = if (txt == "Sta" || txt == "Nau") 1.30f else 1.0f
                 drawScaleNumeralUpright(
                     measurer = measurer,
                     text = txt,
@@ -583,7 +586,7 @@ private fun DrawScope.drawFixedChapterRing(g: DialGeom, measurer: TextMeasurer) 
                     radius = markerLabelR,
                     center = g.center,
                     color = DialPalette.Red,
-                    sizeSp = (g.rOuter * 0.038f / density).sp,
+                    sizeSp = (g.rOuter * 0.038f * sizeFactor / density).sp,
                     bold = true
                 )
             }
