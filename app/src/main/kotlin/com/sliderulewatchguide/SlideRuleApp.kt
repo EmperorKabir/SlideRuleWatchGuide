@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sliderulewatchguide.controls.CurvedPresets
@@ -153,6 +154,12 @@ private fun DialColumn(
 ) {
     val haptics = LocalHapticFeedback.current
 
+    // Disclaimer starts EXPANDED on every app launch. Tapping the
+    // "Collapse" button at the bottom of the text hides it and shows a
+    // small "Disclaimer" chip on the left (vertically under the Reset
+    // chip in the presets row). Tapping that chip re-expands the text.
+    var disclaimerExpanded by remember { mutableStateOf(true) }
+
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // Reset (left, on its own) + Examples arc (right) above the watch.
         CurvedPresets(
@@ -163,27 +170,9 @@ private fun DialColumn(
             modifier = Modifier.fillMaxWidth().height(96.dp)
         )
 
-        // Independent-status disclaimer. Sits between the buttons row
-        // and the watch face. Deliberately neutral wording — never
-        // names any specific brand, so it cannot be construed as a
-        // representation about a third party.
-        androidx.compose.material3.Text(
-            text =
-                "This app is an independent educational tool that demonstrates " +
-                "how circular logarithmic slide-rule bezels work. It is not " +
-                "affiliated with, endorsed by, sponsored by, or in any way " +
-                "officially connected to any watch manufacturer or any brand. " +
-                "All trademarks, trade names, and trade dress are the property " +
-                "of their respective owners. No claim is made to any third-party " +
-                "intellectual property. The dial, hands, sub-dials, markers, and " +
-                "all other visual elements are generic representations of common " +
-                "chronograph and slide-rule conventions and contain no copyrighted " +
-                "assets belonging to any manufacturer.",
-            style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+        DisclaimerPanel(
+            expanded = disclaimerExpanded,
+            onToggle = { disclaimerExpanded = !disclaimerExpanded }
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -305,5 +294,73 @@ private fun DialColumn(
                 }
             }
         }
+    }
+}
+
+/**
+ * Independent-status disclaimer panel. Shown expanded on first launch.
+ * Tapping "Collapse" hides the text and replaces it with a slim
+ * "Disclaimer" chip pinned to the LEFT (vertically under the Reset chip
+ * in the presets row). Tapping that chip re-expands the panel.
+ */
+@Composable
+private fun DisclaimerPanel(expanded: Boolean, onToggle: () -> Unit) {
+    if (expanded) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            androidx.compose.material3.Text(
+                text =
+                    "This app is an independent educational tool that demonstrates " +
+                    "how circular logarithmic slide-rule bezels work. It is not " +
+                    "affiliated with, endorsed by, sponsored by, or in any way " +
+                    "officially connected to any watch manufacturer or any brand. " +
+                    "All trademarks, trade names, and trade dress are the property " +
+                    "of their respective owners. No claim is made to any third-party " +
+                    "intellectual property. The dial, hands, sub-dials, markers, and " +
+                    "all other visual elements are generic representations of common " +
+                    "chronograph and slide-rule conventions and contain no copyrighted " +
+                    "assets belonging to any manufacturer.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.size(6.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.weight(1f))
+                DisclaimerToggleChip(label = "Collapse", onClick = onToggle)
+            }
+        }
+    } else {
+        // Collapsed: small chip pinned to the LEFT (under Reset).
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+            DisclaimerToggleChip(label = "Disclaimer", onClick = onToggle)
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun DisclaimerToggleChip(label: String, onClick: () -> Unit) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.outline
+        )
+    ) {
+        androidx.compose.material3.Text(
+            label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = androidx.compose.material3.MaterialTheme.typography.labelLarge.copy(
+                fontSize = 14.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            ),
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }

@@ -366,6 +366,13 @@ private fun DrawScope.drawCoinEdgeBaseplate(g: DialGeom) {
     drawCircle(color = DialPalette.SteelLight, radius = g.rOuter, center = g.center, style = Stroke(width = 1.2f))
     drawCircle(color = DialPalette.BezelEdgeShadow, radius = rBase, center = g.center,
         style = Stroke(width = g.rOuter * 0.008f))
+    // Thin black perimeter border — gives the chrome rim a clear edge
+    // against light-mode backgrounds (where the silver teeth previously
+    // bled into white). Drawn UNDER the crown / pushers, so those tabs
+    // visually break the border at 2 and 4 o'clock instead of running
+    // straight through them.
+    drawCircle(color = Color.Black, radius = g.rOuter, center = g.center,
+        style = Stroke(width = g.rOuter * 0.012f))
 }
 
 private fun DrawScope.drawBezelInsertRecess(g: DialGeom) {
@@ -624,7 +631,9 @@ private fun DrawScope.drawFixedChapterRing(g: DialGeom, measurer: TextMeasurer) 
  */
 private fun DrawScope.drawMphLabel(g: DialGeom, measurer: TextMeasurer) {
     val mphAngle = DialMath.drawAngleDeg(60.0)
-    val mphTextR = g.rChapterInner - g.rOuter * 0.045f
+    // Pushed further inward (closer to dial centre) so the new RED
+    // MPH up-arrow has clear room above it.
+    val mphTextR = g.rChapterInner - g.rOuter * 0.085f
     drawScaleNumeralUpright(
         measurer = measurer,
         text = "MPH",
@@ -643,9 +652,10 @@ private fun DrawScope.drawMphLabel(g: DialGeom, measurer: TextMeasurer) {
  * shape from photo image 22.
  */
 private fun DrawScope.drawMphArrow(g: DialGeom, angleDeg: Double) {
-    // Simple isoceles triangle — flat base on the chapter-ring inner edge,
-    // sharp tip toward the chapter-ring outer edge. No curved sides, no
-    // narrowed neck. Deliberately generic.
+    // RED isoceles triangle pointing OUTWARD (= up at 12 o'clock).
+    // Matches the visual language of the other red triangle markers on
+    // the dial (STAT, NAUT, KM, 10, 36) instead of the white instrument
+    // arrow it used to be.
     val width = g.rChapterOuter - g.rChapterInner
     val rad = angleDeg * PI / 180.0
     val cosA = cos(rad).toFloat()
@@ -655,7 +665,7 @@ private fun DrawScope.drawMphArrow(g: DialGeom, angleDeg: Double) {
 
     val tipR = g.rChapterOuter
     val baseR = g.rChapterInner + width * 0.10f
-    val baseHalfW = width * 0.18f
+    val baseHalfW = width * 0.16f
 
     val tipX = g.center.x + tipR * cosA
     val tipY = g.center.y + tipR * sinA
@@ -670,8 +680,7 @@ private fun DrawScope.drawMphArrow(g: DialGeom, angleDeg: Double) {
         lineTo(baseRightX, baseRightY)
         close()
     }
-    drawPath(path, color = DialPalette.Hand)
-    drawPath(path, color = Color(0xFF606060), style = Stroke(width = 1.0f))
+    drawPath(path, color = DialPalette.Red)
 }
 
 // =============================================================== dial background
@@ -733,28 +742,36 @@ private fun DrawScope.drawCenteredText(
 private fun DrawScope.drawSubDialFaces(g: DialGeom, measurer: TextMeasurer) {
     val subR = g.rDial * 0.26f
     val offset = g.rDial * 0.42f
-    // 9 o'clock — small running seconds (60-second face); labels at 60/20/40
-    drawSubDialFace(
-        center = Offset(g.center.x - offset, g.center.y), radius = subR,
-        ticks = 60, majorEvery = 5, measurer = measurer,
-        ringNumbers = listOf(60 to "60", 20 to "20", 40 to "40")
-    )
-    // 3 o'clock — 30-min chrono counter
-    drawSubDialFace(
-        center = Offset(g.center.x + offset, g.center.y), radius = subR,
-        ticks = 30, majorEvery = 5, measurer = measurer,
-        ringNumbers = listOf(10 to "10", 20 to "20", 30 to "30")
-    )
-    // 6 o'clock — 12-hr chrono counter (no "6" label; that's where the date sits)
-    val hrCenter = Offset(g.center.x, g.center.y + offset)
+    // Sub-dial layout rotated ONE POSITION CLOCKWISE relative to the
+    // previous layout: the function that USED to live at 9 o'clock is
+    // now at 3 o'clock, what was at 3 is now at 6, what was at 6 is now
+    // at 9.
+    //
+    //   9 o'clock  → 12-hr chronograph counter + date window
+    //   3 o'clock  → running seconds (60-face)
+    //   6 o'clock  → 30-minute chronograph counter
+    val hrCenter = Offset(g.center.x - offset, g.center.y)
     drawSubDialFace(
         center = hrCenter, radius = subR,
         ticks = 12, majorEvery = 3, measurer = measurer,
-        ringNumbers = listOf(3 to "3", 9 to "9", 12 to "12")
+        // Larger numerals at 12 / 3 / 9, smaller numerals at every other
+        // hour position EXCEPT 5 / 6 / 7 (which sit behind the date window).
+        ringNumbers = listOf(3 to "3", 9 to "9", 12 to "12"),
+        smallNumbers = listOf(1 to "1", 2 to "2", 4 to "4", 8 to "8", 10 to "10", 11 to "11")
     )
-    // Date window inside the 12-hr sub-dial: a PORTRAIT aperture (taller
-    // than wide) showing white numerals on the black date wheel, framed
-    // by a thin chrome rim. Matches the slim vertical slot in the photo.
+    drawSubDialFace(
+        center = Offset(g.center.x + offset, g.center.y), radius = subR,
+        ticks = 60, majorEvery = 5, measurer = measurer,
+        // 60-face running seconds: numerals at every ten.
+        ringNumbers = listOf(60 to "60", 10 to "10", 20 to "20", 30 to "30", 40 to "40", 50 to "50")
+    )
+    drawSubDialFace(
+        center = Offset(g.center.x, g.center.y + offset), radius = subR,
+        ticks = 30, majorEvery = 5, measurer = measurer,
+        // 30-min counter: numerals at every five.
+        ringNumbers = listOf(5 to "5", 10 to "10", 15 to "15", 20 to "20", 25 to "25", 30 to "30")
+    )
+    // Date window inside the 12-hr sub-dial (which now sits at 9 o'clock).
     val now = currentLocalDateTime()
     val dateBoxW = subR * 0.42f
     val dateBoxH = subR * 0.50f
@@ -777,7 +794,8 @@ private fun DrawScope.drawSubDialFaces(g: DialGeom, measurer: TextMeasurer) {
 
 private fun DrawScope.drawSubDialFace(
     center: Offset, radius: Float, ticks: Int, majorEvery: Int,
-    ringNumbers: List<Pair<Int, String>>, measurer: TextMeasurer
+    ringNumbers: List<Pair<Int, String>>, measurer: TextMeasurer,
+    smallNumbers: List<Pair<Int, String>> = emptyList()
 ) {
     drawCircle(color = DialPalette.SubdialBlack, radius = radius, center = center)
     drawCircle(color = Color(0xFF1A1A1A), radius = radius, center = center,
@@ -817,6 +835,23 @@ private fun DrawScope.drawSubDialFace(
         drawText(textLayoutResult = l,
             topLeft = Offset(tx - l.size.width / 2f, ty - l.size.height / 2f))
     }
+    // Smaller numerals at non-major positions (e.g., 1/2/4/8/10/11 on the
+    // 12-hr counter). Drawn at ~55 % the size of the major numerals.
+    for ((tick, txt) in smallNumbers) {
+        val angle = tick * (360.0 / ticks) - 90.0
+        val rad = angle * PI / 180.0
+        val rL = radius * 0.66f
+        val tx = center.x + (rL * cos(rad)).toFloat()
+        val ty = center.y + (rL * sin(rad)).toFloat()
+        val l = measurer.measure(
+            androidx.compose.ui.text.AnnotatedString(txt),
+            TextStyle(color = DialPalette.Numeral.copy(alpha = 0.85f),
+                fontSize = (radius * 0.17f / density).sp,
+                fontWeight = FontWeight.Medium)
+        )
+        drawText(textLayoutResult = l,
+            topLeft = Offset(tx - l.size.width / 2f, ty - l.size.height / 2f))
+    }
     drawCircle(color = DialPalette.Hand, radius = radius * 0.05f, center = center)
 }
 
@@ -836,10 +871,10 @@ private const val BEATS_PER_SECOND: Double = 8.0
 private fun DrawScope.drawSubDialSecondsHand(g: DialGeom, now: LocalDateTime) {
     val subR = g.rDial * 0.26f
     val offset = g.rDial * 0.42f
-    val secondsCenter = Offset(g.center.x - offset, g.center.y)
+    // Running seconds sub-dial is now at 3 o'clock (rotated one position
+    // clockwise from its previous 9 o'clock placement).
+    val secondsCenter = Offset(g.center.x + offset, g.center.y)
     val raw = now.second + now.nanosecond / 1e9
-    // Snap to the nearest 1/8 second so the hand TICKS at 8 Hz like the
-    // reference balance — no continuous sweep.
     val ticked = floor(raw * BEATS_PER_SECOND) / BEATS_PER_SECOND
     val angle = (ticked * 6.0).toFloat()
     drawSubDialHand(secondsCenter, subR * 0.85f, angle, DialPalette.Hand, subR * 0.04f)
@@ -853,13 +888,14 @@ private fun DrawScope.drawChronoMinAndHourHands(g: DialGeom, chronoMs: Long) {
     val hours = (totalSec / 3600.0) % 12.0           // 12-hr counter
     val minAngle = (minutes / 30.0 * 360.0).toFloat()
     val hrAngle = (hours / 12.0 * 360.0).toFloat()
+    // 30-min counter is now at 6 o'clock; 12-hr counter is now at 9 o'clock.
     drawSubDialHand(
-        center = Offset(g.center.x + offset, g.center.y),
+        center = Offset(g.center.x, g.center.y + offset),
         length = subR * 0.80f, angleDeg = minAngle,
         color = DialPalette.Hand, thickness = subR * 0.04f
     )
     drawSubDialHand(
-        center = Offset(g.center.x, g.center.y + offset),
+        center = Offset(g.center.x - offset, g.center.y),
         length = subR * 0.78f, angleDeg = hrAngle,
         color = DialPalette.Hand, thickness = subR * 0.04f
     )
@@ -868,24 +904,26 @@ private fun DrawScope.drawChronoMinAndHourHands(g: DialGeom, chronoMs: Long) {
 // =============================================================== applied hour indices
 
 private fun DrawScope.drawDialHourIndices(g: DialGeom) {
-    // Sub-dial outer edge is at offset 0.45 + radius 0.26 = 0.71 r from
-    // dial centre. Hour markers at 3, 6, 9 are TRUNCATED so they sit
-    // entirely outside their adjacent sub-dial.
-    val rOut = g.rDial * 0.95f             // outer end (inner edge of chapter ring)
-    val rInFull = g.rDial * 0.62f          // inner end for "long" markers (1, 2, 4, 5, 7, 8, 10, 11)
-    val rInShort = g.rDial * 0.74f         // inner end for "short" markers at 3, 6, 9
+    // ALL hour markers share the SAME length as the (formerly short) 6
+    // o'clock baton, and they all render in a coral-red shade that
+    // complements the burgundy dial. 12 o'clock is a thin single line,
+    // shortened further so the red MPH up-arrow + MPH text on the
+    // chapter ring above remain fully legible.
+    val rOut = g.rDial * 0.94f
+    val rInShort = g.rDial * 0.74f
     val width = g.rDial * 0.022f
+    val markerColor = Color(0xFFE85A45)   // coral red — complements burgundy
 
-    fun drawMarker(angle: Double, rIn: Float, rOut: Float, w: Float, xOffset: Float = 0f) {
+    fun drawMarker(angle: Double, rIn: Float, rOut: Float, w: Float) {
         val rad = angle * PI / 180.0
         val cosA = cos(rad).toFloat()
         val sinA = sin(rad).toFloat()
         val perpX = (-sinA) * w
         val perpY = cosA * w
-        val tipX = g.center.x + (rOut * cos(rad)).toFloat() + xOffset * (-sinA)
-        val tipY = g.center.y + (rOut * sin(rad)).toFloat() + xOffset * cosA
-        val baseX = g.center.x + (rIn * cos(rad)).toFloat() + xOffset * (-sinA)
-        val baseY = g.center.y + (rIn * sin(rad)).toFloat() + xOffset * cosA
+        val tipX = g.center.x + (rOut * cos(rad)).toFloat()
+        val tipY = g.center.y + (rOut * sin(rad)).toFloat()
+        val baseX = g.center.x + (rIn * cos(rad)).toFloat()
+        val baseY = g.center.y + (rIn * sin(rad)).toFloat()
         val path = Path().apply {
             moveTo(tipX + perpX, tipY + perpY)
             lineTo(tipX - perpX, tipY - perpY)
@@ -893,36 +931,17 @@ private fun DrawScope.drawDialHourIndices(g: DialGeom) {
             lineTo(baseX + perpX, baseY + perpY)
             close()
         }
-        drawPath(path = path, color = DialPalette.Hand)
-        // Centre highlight stripe (chamfered 3D look)
-        val centreW = w * 0.20f
-        val centrePath = Path().apply {
-            val cpX = (-sinA) * centreW
-            val cpY = cosA * centreW
-            moveTo(tipX + cpX, tipY + cpY)
-            lineTo(tipX - cpX, tipY - cpY)
-            lineTo(baseX - cpX, baseY - cpY)
-            lineTo(baseX + cpX, baseY + cpY)
-            close()
-        }
-        drawPath(path = centrePath, color = DialPalette.HandFrame)
-        drawPath(path = path, color = Color(0xFF1A1A1A), style = Stroke(width = 0.9f))
+        drawPath(path = path, color = markerColor)
     }
 
     for (h in 0 until 12) {
         val angle = h * 30.0 - 90.0
-        when (h) {
-            0 -> {
-                // 12 o'clock — single, wider, slightly longer baton. No
-                // double-baton (that's a brand-specific cue).
-                drawMarker(angle, g.rDial * 0.60f, g.rDial * 0.94f, width * 1.20f)
-            }
-            3, 9 -> drawMarker(angle, rInShort, rOut, width * 0.85f)   // sub-dial-truncated, slightly thinner
-            6 -> drawMarker(angle, rInShort, rOut, width * 0.85f)      // matched to 3 / 9
-            // Cardinal-fives (1, 2, 4, 5, 7, 8, 10, 11) alternate length
-            // to give a more generic instrument-watch rhythm.
-            1, 5, 7, 11 -> drawMarker(angle, rInFull * 1.05f, rOut, width * 0.90f)
-            else -> drawMarker(angle, rInFull, rOut, width)
+        if (h == 0) {
+            // 12 o'clock: single thin line, shortened so the MPH up-arrow
+            // and the MPH text on the chapter ring above are unobscured.
+            drawMarker(angle, rInShort, g.rDial * 0.82f, width * 0.28f)
+        } else {
+            drawMarker(angle, rInShort, rOut, width * 0.85f)
         }
     }
 }

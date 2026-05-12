@@ -148,7 +148,7 @@ fun FloatingEquations(
             title = "Miles to kilometres",
             primaryExplanation =
                 "Line up your miles value on the outer ring with the small red " +
-                "STAT triangle. Read the kilometres above the KM marker.",
+                "Sta triangle. Read the kilometres above the KM marker.",
             primaryLive =
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")} = " +
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")}.",
@@ -160,8 +160,8 @@ fun FloatingEquations(
         Section(
             title = "Nautical miles to kilometres",
             primaryExplanation =
-                "Line up your nautical mile value with the NAUT triangle. " +
-                "Read the kilometres above the KM marker. Same trick as STAT, " +
+                "Line up your nautical mile value with the Nau triangle. " +
+                "Read the kilometres above the KM marker. Same trick as Sta, " +
                 "but for sea or air distances.",
             primaryLive =
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")} = " +
