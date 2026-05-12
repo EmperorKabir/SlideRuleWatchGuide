@@ -1102,19 +1102,21 @@ private fun DrawScope.drawBatonHand(
 // =============================================================== crown + pushers (decorative)
 
 private fun DrawScope.drawCrownAndPushers(g: DialGeom) {
+    // Pulled in so the cap's outer face terminates at the OUTER EDGE
+    // of the perimeter border (rOuter + half border thickness =
+    // rOuter × 1.012). Anchor is at rOuter × 0.985, so total radial
+    // extension (shaftLen + capDepth) is 0.027 r.
     drawAngledChronoControl(g, angleFromNorthDeg = 60.0,                  // 2 o'clock — top pusher
-        shaftLen = g.rOuter * 0.020f, shaftHalfW = g.rOuter * 0.030f,
-        capDepth = g.rOuter * 0.060f, capHalfW = g.rOuter * 0.065f,
+        shaftLen = g.rOuter * 0.005f, shaftHalfW = g.rOuter * 0.030f,
+        capDepth = g.rOuter * 0.022f, capHalfW = g.rOuter * 0.065f,
         reeded = true)
     drawAngledChronoControl(g, angleFromNorthDeg = 120.0,                 // 4 o'clock — bottom pusher
-        shaftLen = g.rOuter * 0.020f, shaftHalfW = g.rOuter * 0.030f,
-        capDepth = g.rOuter * 0.060f, capHalfW = g.rOuter * 0.065f,
+        shaftLen = g.rOuter * 0.005f, shaftHalfW = g.rOuter * 0.030f,
+        capDepth = g.rOuter * 0.022f, capHalfW = g.rOuter * 0.065f,
         reeded = true)
-    // Crown stem nearly zero — cap sits almost flush with the case rim,
-    // matching photo image 15.
     drawAngledChronoControl(g, angleFromNorthDeg = 90.0,                  // 3 o'clock — crown
-        shaftLen = g.rOuter * 0.015f, shaftHalfW = g.rOuter * 0.045f,
-        capDepth = g.rOuter * 0.080f, capHalfW = g.rOuter * 0.090f,
+        shaftLen = g.rOuter * 0.005f, shaftHalfW = g.rOuter * 0.045f,
+        capDepth = g.rOuter * 0.022f, capHalfW = g.rOuter * 0.090f,
         reeded = true)
 }
 
