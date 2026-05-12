@@ -1102,24 +1102,24 @@ private fun DrawScope.drawBatonHand(
 // =============================================================== crown + pushers (decorative)
 
 private fun DrawScope.drawCrownAndPushers(g: DialGeom) {
-    // Cap-outer-face target = OUTER edge of the perimeter border.
-    // Border is drawn at rOuter with stroke width 0.024 r, so its outer
-    // edge is at rOuter × (1 + 0.024 / 2) = rOuter × 1.012. Each control
-    // keeps its ORIGINAL visual size; only its anchor shifts inward to
-    // make the tip land at this radius.
-    val tipR = g.rOuter * 1.012f
+    // Each control's INNER edge (where the shaft meets the case rim)
+    // sits exactly at the OUTER edge of the perimeter border, so the
+    // whole control is OUTSIDE the watch face and does not overlap
+    // the bezel scale. Border = 0.024 r stroke centred on rOuter, so
+    // its outer edge is at rOuter × 1.012.
+    val anchorR = g.rOuter * 1.012f
     drawAngledChronoControl(g, angleFromNorthDeg = 60.0,                  // 2 o'clock — top pusher
         shaftLen = g.rOuter * 0.020f, shaftHalfW = g.rOuter * 0.030f,
         capDepth = g.rOuter * 0.060f, capHalfW = g.rOuter * 0.065f,
-        reeded = true, tipR = tipR)
+        reeded = true, anchorR = anchorR)
     drawAngledChronoControl(g, angleFromNorthDeg = 120.0,                 // 4 o'clock — bottom pusher
         shaftLen = g.rOuter * 0.020f, shaftHalfW = g.rOuter * 0.030f,
         capDepth = g.rOuter * 0.060f, capHalfW = g.rOuter * 0.065f,
-        reeded = true, tipR = tipR)
+        reeded = true, anchorR = anchorR)
     drawAngledChronoControl(g, angleFromNorthDeg = 90.0,                  // 3 o'clock — crown
         shaftLen = g.rOuter * 0.015f, shaftHalfW = g.rOuter * 0.045f,
         capDepth = g.rOuter * 0.080f, capHalfW = g.rOuter * 0.090f,
-        reeded = true, tipR = tipR)
+        reeded = true, anchorR = anchorR)
 }
 
 /**
@@ -1144,7 +1144,7 @@ private fun DrawScope.drawAngledChronoControl(
     capDepth: Float,
     capHalfW: Float,
     reeded: Boolean,
-    tipR: Float                       // radial position of the cap's outer face
+    anchorR: Float                    // radial position of the INNER edge of the shaft
 ) {
     // Convert "degrees clockwise from 12 o'clock" → screen angle (0 = +x).
     val screenAngleDeg = angleFromNorthDeg - 90.0
@@ -1154,12 +1154,10 @@ private fun DrawScope.drawAngledChronoControl(
     val px = -ny                  // perpendicular-to-radial x
     val py = nx                   // perpendicular-to-radial y
 
-    // Anchor (where the shaft starts) is derived BACKWARDS from the
-    // requested cap-outer-face position [tipR] minus the full radial
-    // extent of the control (shaftLen + capDepth). This way the cap's
-    // outer face always lands exactly at tipR, regardless of the
-    // control's chosen size.
-    val rRim = tipR - shaftLen - capDepth
+    // Anchor (where the shaft starts) = [anchorR], so the shaft and cap
+    // grow OUTWARD from there. With anchorR set to the border's outer
+    // edge, the entire control sits beyond the bezel face.
+    val rRim = anchorR
     val ax = g.center.x + rRim * nx
     val ay = g.center.y + rRim * ny
 
