@@ -126,6 +126,17 @@ private fun StaticDial(measurer: TextMeasurer, modifier: Modifier) {
         drawSubDialFaces(g, measurer)
         drawDialHourIndices(g)
         drawCrownAndPushers(g)
+        // Backstop: thin dark stroke at rChapterInner (chapter-ring /
+        // dial boundary). Drawn LAST so it sits on top of anything that
+        // might bleed across the boundary from either side at high
+        // system font scale. The font-scale cap already prevents most
+        // bleed; this is belt-and-suspenders.
+        drawCircle(
+            color = DialPalette.BezelInsertBlack,
+            radius = g.rChapterInner,
+            center = g.center,
+            style = Stroke(width = g.rOuter * 0.006f)
+        )
     }
 }
 

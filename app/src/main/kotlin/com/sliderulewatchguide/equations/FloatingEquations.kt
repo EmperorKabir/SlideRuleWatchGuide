@@ -103,9 +103,11 @@ fun FloatingEquations(
                 "Bezel multiplier is ${fmt(k)}; inner ${fmt(y)} × ${fmt(k)} = ${fmt(y * k)}."
             else "Slide the bezel to set a multiplier; the live value will appear here.",
             altExplanation =
-                "Alternative: With the same bezel setting, pick a number on " +
-                "the outer ring. The inner value directly below it equals that " +
-                "outer number divided by the multiplier (i.e. × 1 / multiplier).",
+                "Alternative (division by the same multiplier): the same " +
+                "alignment also divides. Pick a number on the outer ring; the " +
+                "inner value directly below it is that outer number divided by " +
+                "the multiplier. Multiplication and division share one bezel " +
+                "setting — switch direction to switch operation.",
             altLive = if (x != null && invK.isFinite())
                 "Outer ${fmt(x)} ÷ ${fmt(k)} = ${fmt(x * invK)} on inner."
             else null
@@ -188,6 +190,26 @@ fun FloatingEquations(
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")}."
         )
 
+        // ---------------- Nautical miles ↔ Statute miles (with reverse)
+        Section(
+            title = "Nautical miles to statute miles",
+            primaryExplanation =
+                "Line up your nautical mile value with the Nau triangle. " +
+                "Read the statute mile equivalent above the Sta triangle " +
+                "directly. One nautical mile is about 1.151 statute miles.",
+            primaryLive =
+                "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")} = " +
+                "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")}.",
+            altExplanation =
+                "Reverse: with the same alignment, pick a statute mile value " +
+                "and read the equivalent nautical miles above the Nau triangle. " +
+                "Useful for converting in either direction without re-aligning " +
+                "the bezel.",
+            altLive =
+                "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")} = " +
+                "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")}."
+        )
+
         // ---------------- Hours / Minutes / Seconds (with alternative)
         Section(
             title = "Hours, minutes and seconds",
@@ -204,16 +226,18 @@ fun FloatingEquations(
                 "${fmt(k * 60)} ${unit(k * 60, "minute", "minutes")} = " +
                 "${fmt(k * 3600)} ${unit(k * 3600, "second", "seconds")}.",
             altExplanation =
-                "Alternative: The 36 and 60 markers sit on both the inner " +
-                "and outer rings, so you can invert the calculation just like " +
-                "division and multiplication. For example, given a time in " +
-                "seconds, line that value (÷100) on the outer scale up to " +
-                "inner 36 to read the equivalent hours. With seconds 14,400 " +
-                "(= 144 on outer) above inner 36, inner 10 reads 4 — that's " +
-                "4 hours.",
+                "Alternative (any anchor): the 36 and 60 markers sit on both " +
+                "the inner and outer rings, so you can drive the conversion " +
+                "from any of the three anchors (10, 60, 36). For example, " +
+                "given seconds, line the seconds value (÷ 1000) on the outer " +
+                "scale up to inner 36; the equivalent hours read above inner " +
+                "10. With 14,400 seconds aligned at inner 36 (outer reads " +
+                "14.4), inner 10 sits below outer 4 — that's 4 hours. The " +
+                "factor of 10 you need depends on the magnitude of the " +
+                "starting value (see Factors of 10 above).",
             altLive =
-                "Bezel reads above inner 60: ${fmt(above60)} (minutes ÷ 10); " +
-                "above inner 36: ${fmt(above36)} (seconds ÷ 100)."
+                "Bezel currently reads: above inner 60 → ${fmt(above60)}; " +
+                "above inner 36 → ${fmt(above36)}."
         )
     }
 }

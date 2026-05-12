@@ -368,7 +368,7 @@ private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) 
                 Spacer(Modifier.size(16.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Spacer(Modifier.weight(1f))
-                    DisclaimerToggleChip(label = "Collapse", onClick = onToggle)
+                    DisclaimerToggleChip(label = "Dismiss", onClick = onToggle)
                 }
             }
         }
