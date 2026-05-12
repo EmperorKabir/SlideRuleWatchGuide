@@ -366,11 +366,14 @@ private fun DrawScope.drawCoinEdgeBaseplate(g: DialGeom) {
     drawCircle(color = DialPalette.SteelLight, radius = g.rOuter, center = g.center, style = Stroke(width = 1.2f))
     drawCircle(color = DialPalette.BezelEdgeShadow, radius = rBase, center = g.center,
         style = Stroke(width = g.rOuter * 0.008f))
-    // Black perimeter border — doubled in thickness from the original
-    // 0.012 r so it reads as a deliberate frame rather than a hairline.
-    // Drawn UNDER the crown / pushers, so those tabs visually break the
-    // border at 2 and 4 o'clock instead of running straight through.
-    drawCircle(color = Color.Black, radius = g.rOuter, center = g.center,
+    // Perimeter border, coloured to match the bezel insert background
+    // (BezelInsertBlack = 0xFF0B0B0B) so the rim, border and bezel face
+    // read as one continuous dark surface rather than a black ring
+    // ringed by a still-black ring. Doubled in thickness from the
+    // original 0.012 r so it reads as a deliberate frame. Drawn UNDER
+    // the crown / pushers, so those tabs visually break the border at
+    // 2 and 4 o'clock instead of running straight through.
+    drawCircle(color = DialPalette.BezelInsertBlack, radius = g.rOuter, center = g.center,
         style = Stroke(width = g.rOuter * 0.024f))
 }
 
