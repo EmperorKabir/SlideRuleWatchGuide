@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -55,12 +56,21 @@ fun SlideRuleApp() {
     val kmText by vm.kmInput.collectAsStateWithLifecycle()
     val chronoState by vm.chronoState.collectAsStateWithLifecycle()
 
+    // Disclaimer state lifted to the top level so it can render as an
+    // overlay z-stacked OVER the main content. Underlying layout stays
+    // in place regardless of disclaimer visibility — dismissing the
+    // overlay does not shift the watch or the equations panel at all.
+    var disclaimerExpanded by remember { mutableStateOf(true) }
+
     Scaffold { innerPadding ->
-        BoxWithConstraints(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
+        ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
         ) {
             val isWide = maxWidth >= 720.dp
             if (isWide) {
@@ -136,6 +146,16 @@ fun SlideRuleApp() {
                 }
             }
         }
+        // Overlay layer (z-stacked above main content). When the
+        // disclaimer is expanded, this draws a dark scrim and the
+        // full text panel over EVERYTHING. When collapsed, only a
+        // small "Disclaimer" chip is visible (pinned top-left under
+        // the Reset chip). The underlying layout never shifts.
+        DisclaimerOverlay(
+            expanded = disclaimerExpanded,
+            onToggle = { disclaimerExpanded = !disclaimerExpanded }
+        )
+        }
     }
 }
 
@@ -154,11 +174,10 @@ private fun DialColumn(
 ) {
     val haptics = LocalHapticFeedback.current
 
-    // Disclaimer starts EXPANDED on every app launch. Tapping the
-    // "Collapse" button at the bottom of the text hides it and shows a
-    // small "Disclaimer" chip on the left (vertically under the Reset
-    // chip in the presets row). Tapping that chip re-expands the text.
-    var disclaimerExpanded by remember { mutableStateOf(true) }
+    // Disclaimer is now rendered as an overlay at the SlideRuleApp top
+    // level (sibling of this column). DialColumn no longer participates
+    // in disclaimer state — the underlying layout is stable regardless
+    // of the overlay's visibility.
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         // Reset (left, on its own) + Examples arc (right) above the watch.
@@ -168,11 +187,6 @@ private fun DialColumn(
             // Tall enough to fit the steeper chip arc (centre chip up
             // top, outer chips ~44 dp lower) plus the EXAMPLES caption.
             modifier = Modifier.fillMaxWidth().height(96.dp)
-        )
-
-        DisclaimerPanel(
-            expanded = disclaimerExpanded,
-            onToggle = { disclaimerExpanded = !disclaimerExpanded }
         )
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -303,40 +317,71 @@ private fun DialColumn(
  * "Disclaimer" chip pinned to the LEFT (vertically under the Reset chip
  * in the presets row). Tapping that chip re-expands the panel.
  */
+/**
+ * Sibling-Box overlay: z-stacked above the main app content. When
+ * [expanded] is true, a full-screen scrim + centred panel covers
+ * everything (the underlying watch and equations remain laid out in
+ * their normal positions — they're just visually obscured). When
+ * collapsed, only a small "Disclaimer" chip is visible, pinned to the
+ * top-left under the Reset chip in the presets row. The underlying
+ * layout NEVER shifts based on this state.
+ */
 @Composable
-private fun DisclaimerPanel(expanded: Boolean, onToggle: () -> Unit) {
+private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) {
     if (expanded) {
-        Column(
+        // Full-screen scrim. Tapping the scrim does NOT dismiss — the
+        // user must use the explicit "Collapse" button so the dismissal
+        // is intentional (matches the user's spec). But the scrim MUST
+        // absorb the tap so it doesn't fall through to underlying
+        // composables (which would open keyboards / focus text fields).
+        androidx.compose.foundation.layout.Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .matchParentSize()
+                .background(androidx.compose.ui.graphics.Color(0xFF0E0E0E))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = { /* swallow taps */ }
+                )
         ) {
-            androidx.compose.material3.Text(
-                text =
-                    "This app is an independent educational tool that demonstrates " +
-                    "how circular logarithmic slide-rule bezels work. It is not " +
-                    "affiliated with, endorsed by, sponsored by, or in any way " +
-                    "officially connected to any watch manufacturer or any brand. " +
-                    "All trademarks, trade names, and trade dress are the property " +
-                    "of their respective owners. No claim is made to any third-party " +
-                    "intellectual property. The dial, hands, sub-dials, markers, and " +
-                    "all other visual elements are generic representations of common " +
-                    "chronograph and slide-rule conventions and contain no copyrighted " +
-                    "assets belonging to any manufacturer.",
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.size(6.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Spacer(Modifier.weight(1f))
-                DisclaimerToggleChip(label = "Collapse", onClick = onToggle)
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 24.dp)
+            ) {
+                androidx.compose.material3.Text(
+                    text =
+                        "This app is an independent educational tool that demonstrates " +
+                        "how circular logarithmic slide-rule bezels work. It is not " +
+                        "affiliated with, endorsed by, sponsored by, or in any way " +
+                        "officially connected to any watch manufacturer or any brand. " +
+                        "All trademarks, trade names, and trade dress are the property " +
+                        "of their respective owners. No claim is made to any third-party " +
+                        "intellectual property. The dial, hands, sub-dials, markers, and " +
+                        "all other visual elements are generic representations of common " +
+                        "chronograph and slide-rule conventions and contain no copyrighted " +
+                        "assets belonging to any manufacturer.",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.ui.graphics.Color(0xFFEAEAEA)
+                )
+                Spacer(Modifier.size(16.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.weight(1f))
+                    DisclaimerToggleChip(label = "Collapse", onClick = onToggle)
+                }
             }
         }
     } else {
-        // Collapsed: small chip pinned to the LEFT (under Reset).
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+        // Collapsed: small chip pinned to top-left. Sits just BELOW the
+        // Reset chip's vertical position. Doesn't overlap the Examples
+        // arc which is to its right.
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 12.dp, top = 64.dp)
+        ) {
             DisclaimerToggleChip(label = "Disclaimer", onClick = onToggle)
-            Spacer(Modifier.weight(1f))
         }
     }
 }
