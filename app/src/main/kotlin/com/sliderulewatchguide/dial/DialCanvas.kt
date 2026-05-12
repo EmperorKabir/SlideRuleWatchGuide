@@ -73,7 +73,6 @@ fun WatchDial(
     chronoMillisProvider: () -> Long,
     modifier: Modifier = Modifier
 ) {
-    val measurer = rememberTextMeasurer()
     // Cap the font-scale just for the watch face. Outside this scope
     // (equations panel, preset chips, input fields) the system's actual
     // fontScale keeps applying unchanged.
@@ -84,6 +83,12 @@ fun WatchDial(
         else Density(density = systemDensity.density, fontScale = capped)
     }
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
+        // CRITICAL: rememberTextMeasurer must be called INSIDE this scope
+        // so it captures the capped density. Calling it ABOVE the
+        // provider (in the parent composition) silently captures the
+        // ORIGINAL system density and the cap is ignored. Confirmed via
+        // Android documentation on CompositionLocalProvider behaviour.
+        val measurer = rememberTextMeasurer()
         Box(
             modifier = modifier
                 .aspectRatio(1f)

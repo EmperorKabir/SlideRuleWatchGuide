@@ -103,10 +103,11 @@ fun FloatingEquations(
                 "Bezel multiplier is ${fmt(k)}; inner ${fmt(y)} × ${fmt(k)} = ${fmt(y * k)}."
             else "Slide the bezel to set a multiplier; the live value will appear here.",
             altExplanation =
-                "Alternative: Line up inner 10 with the outer multiplier. Any " +
-                "inner number reads on the outer scale × that multiplier.",
+                "Alternative: With the same bezel setting, pick a number on " +
+                "the outer ring. The inner value directly below it equals that " +
+                "outer number divided by the multiplier (i.e. × 1 / multiplier).",
             altLive = if (x != null && invK.isFinite())
-                "Outer ${fmt(x)} × ${fmt(invK)} = ${fmt(x * invK)} on inner."
+                "Outer ${fmt(x)} ÷ ${fmt(k)} = ${fmt(x * invK)} on inner."
             else null
         )
 
@@ -126,7 +127,7 @@ fun FloatingEquations(
             altLive = null
         )
 
-        // ---------------- Time
+        // ---------------- Time (with distance-from-time alternative)
         Section(
             title = "Time for a journey",
             primaryExplanation =
@@ -139,11 +140,18 @@ fun FloatingEquations(
                 "At ${fmt(mph)} mph, ${fmt(x)} ${unit(x, "mile", "miles")} takes " +
                 "${fmt(x * 60.0 / mph)} ${unit(x * 60.0 / mph, "minute", "minutes")}."
             else "Set a speed on the dial to see how long a distance takes.",
-            altExplanation = null,
-            altLive = null
+            altExplanation =
+                "Alternative (distance from time): With the same speed " +
+                "alignment, pick a time in minutes on the inner ring. The " +
+                "outer value above it is how far you travel in that time at " +
+                "the set speed.",
+            altLive = if (y != null && mph.isFinite() && mph > 0)
+                "At ${fmt(mph)} mph, ${fmt(y)} ${unit(y, "minute", "minutes")} covers " +
+                "${fmt(y * mph / 60.0)} ${unit(y * mph / 60.0, "mile", "miles")}."
+            else null
         )
 
-        // ---------------- Statute miles ↔ km
+        // ---------------- Statute miles ↔ km (with reverse direction)
         Section(
             title = "Miles to kilometres",
             primaryExplanation =
@@ -152,11 +160,16 @@ fun FloatingEquations(
             primaryLive =
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")} = " +
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")}.",
-            altExplanation = null,
-            altLive = null
+            altExplanation =
+                "Reverse: with the same alignment, the outer value above " +
+                "any kilometre value on the inner ring is the equivalent in " +
+                "statute miles. Pick KM, read miles.",
+            altLive =
+                "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")} = " +
+                "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")}."
         )
 
-        // ---------------- Nautical miles ↔ km
+        // ---------------- Nautical miles ↔ km (with reverse direction)
         Section(
             title = "Nautical miles to kilometres",
             primaryExplanation =
@@ -166,8 +179,13 @@ fun FloatingEquations(
             primaryLive =
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")} = " +
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")}.",
-            altExplanation = null,
-            altLive = null
+            altExplanation =
+                "Reverse: with the same alignment, the outer value above any " +
+                "kilometre value is the equivalent in nautical miles. Pick KM, " +
+                "read nautical miles.",
+            altLive =
+                "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")} = " +
+                "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")}."
         )
 
         // ---------------- Hours / Minutes / Seconds (with alternative)
@@ -188,10 +206,14 @@ fun FloatingEquations(
             altExplanation =
                 "Alternative: The 36 and 60 markers sit on both the inner " +
                 "and outer rings, so you can invert the calculation just like " +
-                "division and multiplication. Drive it from whichever anchor " +
-                "is more convenient. The bezel keeps the others in sync.",
+                "division and multiplication. For example, given a time in " +
+                "seconds, line that value (÷100) on the outer scale up to " +
+                "inner 36 to read the equivalent hours. With seconds 14,400 " +
+                "(= 144 on outer) above inner 36, inner 10 reads 4 — that's " +
+                "4 hours.",
             altLive =
-                "Bezel reads above inner 60: ${fmt(above60)}; above inner 36: ${fmt(above36)}."
+                "Bezel reads above inner 60: ${fmt(above60)} (minutes ÷ 10); " +
+                "above inner 36: ${fmt(above36)} (seconds ÷ 100)."
         )
     }
 }
