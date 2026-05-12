@@ -29,10 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,10 +72,14 @@ fun SlideRuleApp() {
             modifier = Modifier.fillMaxSize()
         ) {
             val isWide = maxWidth >= 720.dp
+            // Hoist the equations-panel scroll state so it survives any
+            // recomposition triggered by font-scale / rotation changes.
+            val equationsScroll = rememberScrollState()
             if (isWide) {
                 Row(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                     DialColumn(
                         modifier = Modifier.weight(1f),
+                        isWide = true,
                         rotation = rotation,
                         chronoState = chronoState,
                         chronoMillisProvider = vm::currentChronoMs,
@@ -88,20 +91,52 @@ fun SlideRuleApp() {
                         vm = vm
                     )
                     Spacer(Modifier.size(12.dp))
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        FloatingEquations(
-                            rotationDegrees = rotation,
-                            outer = outerText,
-                            inner = innerText,
-                            statRead = statText,
-                            nautRead = nautText,
-                            kmRead = kmText
-                        )
+                    // Right column: input panels on top (their own Row),
+                    // live equations below in a scrollable sub-column.
+                    // The dial column on the left stays full-size at any
+                    // font scale because its sizing no longer depends
+                    // on the input panels' heights.
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            BezelInputs(
+                                outer = outerText,
+                                inner = innerText,
+                                onOuterChange = vm::setOuterText,
+                                onInnerChange = vm::setInnerText,
+                                onCommit = vm::commitInputs
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            ConverterInputs(
+                                stat = statText,
+                                naut = nautText,
+                                km = kmText,
+                                onStatChange = vm::setStatText,
+                                onNautChange = vm::setNautText,
+                                onKmChange = vm::setKmText,
+                                onCommitStat = vm::commitStat,
+                                onCommitNaut = vm::commitNaut,
+                                onCommitKm = vm::commitKm
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(equationsScroll),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            FloatingEquations(
+                                rotationDegrees = rotation,
+                                outer = outerText,
+                                inner = innerText,
+                                statRead = statText,
+                                nautRead = nautText,
+                                kmRead = kmText
+                            )
+                        }
                     }
                 }
             } else {
@@ -118,6 +153,7 @@ fun SlideRuleApp() {
                 ) {
                     DialColumn(
                         modifier = Modifier.fillMaxWidth(),
+                        isWide = false,
                         rotation = rotation,
                         chronoState = chronoState,
                         chronoMillisProvider = vm::currentChronoMs,
@@ -162,6 +198,7 @@ fun SlideRuleApp() {
 @Composable
 private fun DialColumn(
     modifier: Modifier,
+    isWide: Boolean,
     rotation: Double,
     chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
     chronoMillisProvider: () -> Long,
@@ -172,8 +209,6 @@ private fun DialColumn(
     kmText: String,
     vm: DialViewModel
 ) {
-    val haptics = LocalHapticFeedback.current
-
     // Disclaimer is now rendered as an overlay at the SlideRuleApp top
     // level (sibling of this column). DialColumn no longer participates
     // in disclaimer state — the underlying layout is stable regardless
@@ -189,138 +224,193 @@ private fun DialColumn(
             modifier = Modifier.fillMaxWidth().height(96.dp)
         )
 
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val side = maxWidth
-            val rOuter = side.value * 0.5f * 0.88f
-
-            // Both floating panels report their actual measured size back
-            // via onSizeChanged so the overlap calc adapts to whatever
-            // the bumped fonts / number of rows actually produce on this
-            // device. No more hard-coded width / height constants.
-            var bezelSize by remember { mutableStateOf(IntSize.Zero) }
-            var converterSize by remember { mutableStateOf(IntSize.Zero) }
-            val density = LocalDensity.current
-            val bezelDp = with(density) {
-                bezelSize.width.toDp().value to bezelSize.height.toDp().value
-            }
-            val converterDp = with(density) {
-                converterSize.width.toDp().value to converterSize.height.toDp().value
-            }
-            // Dynamic safety gap: minimum breathing space (in dp) between
-            // the dial edge and the top of a floating box. Scales with
-            // the system fontScale so users on larger Android text get
-            // proportionally more clearance. Only kicks in when a box
-            // would otherwise sit flush against (or inside) the dial.
-            val safetyGapDp = 12f * density.fontScale.coerceAtLeast(1f)
-            fun overlapFor(w: Float, h: Float): Float {
-                if (w == 0f || h == 0f) return 0f
-                // Box anchored to BottomStart/BottomEnd of a container of
-                // height (side + overlap). The closest point of the box to
-                // the dial centre (side/2, side/2) is:
-                //   x_c = clamp(side/2, 0, w)            → dx = max(0, side/2 - w)
-                //   y_c = side + overlap - h             (the top edge)
-                // We need sqrt(dx² + dy²) ≥ rOuter + safetyGap where
-                //   dy = (side + overlap - h) - side/2 = overlap + h - side/2.
-                // Solving for overlap so dy = √(safety² - dx²):
-                //   overlap = √(safety² - dx²) + h - side/2.
-                // When the box is wider than half the dial, dx clamps to 0
-                // and the box has to be pushed below the safety circle's
-                // lowest point — exactly the case that the old corner-
-                // distance heuristic underestimated.
-                val safety = rOuter + safetyGapDp
-                val dxClamped = maxOf(0f, side.value / 2f - w)
-                val termInside = safety * safety - dxClamped * dxClamped
-                if (termInside <= 0f) return 0f
-                val dyNeeded = kotlin.math.sqrt(termInside.toDouble()).toFloat()
-                val needed = dyNeeded + h - side.value / 2f
-                return needed.coerceAtLeast(0f)
-            }
-            val overlap = maxOf(
-                overlapFor(bezelDp.first, bezelDp.second),
-                overlapFor(converterDp.first, converterDp.second)
+        val bezelInputs: @Composable () -> Unit = {
+            BezelInputs(
+                outer = outerText,
+                inner = innerText,
+                onOuterChange = vm::setOuterText,
+                onInnerChange = vm::setInnerText,
+                onCommit = vm::commitInputs
             )
-            // On Fold 7 (~720 dp wide) both overlaps resolve to 0 and the
-            // layout is identical to a plain square BoxWithConstraints.
-            // On narrower screens, the container grows by however many dp
-            // it takes to clear whichever box is the tighter fit.
-            val containerHeight = side + overlap.dp
+        }
+        val converterInputs: @Composable () -> Unit = {
+            ConverterInputs(
+                stat = statText,
+                naut = nautText,
+                km = kmText,
+                onStatChange = vm::setStatText,
+                onNautChange = vm::setNautText,
+                onKmChange = vm::setKmText,
+                onCommitStat = vm::commitStat,
+                onCommitNaut = vm::commitNaut,
+                onCommitKm = vm::commitKm
+            )
+        }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(containerHeight)
-            ) {
-                // Watch square — anchored to TOP-CENTER. Only the watch
-                // itself receives the bezel drag gesture; the empty
-                // overflow strip below (if any) ignores drags.
+        if (isWide) {
+            // Tablet / wide canvas: dial fills the dial column width at
+            // its full square aspect ratio. The input panels are NOT
+            // drawn in this column — they have been moved to the top of
+            // the equations column (sibling Row in the parent) so the
+            // dial's size never depends on input heights and never
+            // shrinks at any font scale.
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val side = maxWidth
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .align(Alignment.TopCenter)
                         .bezelDragRotation { vm.rotateBy(it) }
                 ) {
-                    WatchDial(
-                        bezelRotationDegrees = rotation,
+                    DialWithPushers(
+                        side = side,
+                        rotation = rotation,
                         chronoState = chronoState,
                         chronoMillisProvider = chronoMillisProvider,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    // Top pusher tap target (start / stop)
-                    Box(modifier = Modifier
-                        .offset(x = side * 0.85f, y = side * 0.20f)
-                        .size(width = side * 0.13f, height = side * 0.13f)
-                        .clickable {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            vm.chronoStartStop()
-                        })
-                    // Bottom pusher tap target (reset)
-                    Box(modifier = Modifier
-                        .offset(x = side * 0.85f, y = side * 0.67f)
-                        .size(width = side * 0.13f, height = side * 0.13f)
-                        .clickable {
-                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            vm.chronoReset()
-                        })
-                }
-
-                // Floating boxes anchored to the container's bottom
-                // corners. If overlap == 0 they sit inside the watch
-                // square's corners; if overlap > 0 the container has been
-                // extended downward, so the boxes sit BELOW the dial.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 2.dp, bottom = 2.dp)
-                        .onSizeChanged { bezelSize = it }
-                ) {
-                    BezelInputs(
-                        outer = outerText,
-                        inner = innerText,
-                        onOuterChange = vm::setOuterText,
-                        onInnerChange = vm::setInnerText,
-                        onCommit = vm::commitInputs
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 2.dp, bottom = 2.dp)
-                        .onSizeChanged { converterSize = it }
-                ) {
-                    ConverterInputs(
-                        stat = statText,
-                        naut = nautText,
-                        km = kmText,
-                        onStatChange = vm::setStatText,
-                        onNautChange = vm::setNautText,
-                        onKmChange = vm::setKmText,
-                        onCommitStat = vm::commitStat,
-                        onCommitNaut = vm::commitNaut,
-                        onCommitKm = vm::commitKm
+                        onChronoStartStop = vm::chronoStartStop,
+                        onChronoReset = vm::chronoReset
                     )
                 }
             }
+        } else {
+            // Compact / portrait: SubcomposeLayout measures the input
+            // panels FIRST, derives a container height that guarantees
+            // the panels' inner corners sit outside the dial's safety
+            // circle by construction, then composes the dial at that
+            // size. Single pass — no reactive feedback, no first-frame
+            // flash where overlap would otherwise be zero. At fontScale
+            // 1.0 on a typical phone the input panels are small enough
+            // that the computed container height equals the dial's
+            // natural square size, so the visual result is identical
+            // to the previous reactive-state implementation. At higher
+            // font scales the container grows JUST enough to clear the
+            // safety circle, and never less.
+            DialWithCornerInputs(
+                rotation = rotation,
+                chronoState = chronoState,
+                chronoMillisProvider = chronoMillisProvider,
+                onBezelDrag = vm::rotateBy,
+                onChronoStartStop = vm::chronoStartStop,
+                onChronoReset = vm::chronoReset,
+                bezelInputs = bezelInputs,
+                converterInputs = converterInputs
+            )
+        }
+    }
+}
+
+/**
+ * Dial + the two chronograph-pusher tap targets, sized to the given [side].
+ * Pulled out so the tablet branch (dial in its own aspect-ratio Box) and
+ * the portrait SubcomposeLayout branch share the same content.
+ */
+@Composable
+private fun DialWithPushers(
+    side: androidx.compose.ui.unit.Dp,
+    rotation: Double,
+    chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
+    chronoMillisProvider: () -> Long,
+    onChronoStartStop: () -> Unit,
+    onChronoReset: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    WatchDial(
+        bezelRotationDegrees = rotation,
+        chronoState = chronoState,
+        chronoMillisProvider = chronoMillisProvider,
+        modifier = Modifier.fillMaxSize()
+    )
+    // Top pusher tap target (start / stop)
+    Box(modifier = Modifier
+        .offset(x = side * 0.85f, y = side * 0.20f)
+        .size(width = side * 0.13f, height = side * 0.13f)
+        .clickable {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onChronoStartStop()
+        })
+    // Bottom pusher tap target (reset)
+    Box(modifier = Modifier
+        .offset(x = side * 0.85f, y = side * 0.67f)
+        .size(width = side * 0.13f, height = side * 0.13f)
+        .clickable {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onChronoReset()
+        })
+}
+
+/**
+ * Single-pass layout used in compact / portrait mode. Measures the two
+ * input panels first, then sizes the container so the panels' inner
+ * corners sit OUTSIDE a circle of radius (rOuter + safetyGap) centred
+ * on the dial — guaranteed no-overlap by construction.
+ */
+@Composable
+private fun DialWithCornerInputs(
+    rotation: Double,
+    chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
+    chronoMillisProvider: () -> Long,
+    onBezelDrag: (Double) -> Unit,
+    onChronoStartStop: () -> Unit,
+    onChronoReset: () -> Unit,
+    bezelInputs: @Composable () -> Unit,
+    converterInputs: @Composable () -> Unit
+) {
+    SubcomposeLayout(modifier = Modifier.fillMaxWidth()) { constraints ->
+        val parentWidth = constraints.maxWidth
+        check(parentWidth != Constraints.Infinity) {
+            "DialWithCornerInputs requires bounded width"
+        }
+
+        val looseInputConstraints = Constraints(maxWidth = parentWidth / 2)
+        val bezelP = subcompose("bezel") { bezelInputs() }
+            .first().measure(looseInputConstraints)
+        val converterP = subcompose("converter") { converterInputs() }
+            .first().measure(looseInputConstraints)
+
+        val dialSide = parentWidth
+        val rOuter = (dialSide * 0.5f * 0.88f).toInt()
+        val safetyPx = 12.dp.toPx().toInt()
+        val safety = rOuter + safetyPx
+        val centre = dialSide / 2
+        val safetySq = safety.toLong() * safety.toLong()
+
+        fun requiredHeight(w: Int, h: Int): Int {
+            val dx = maxOf(0, centre - w)
+            val dxSq = dx.toLong() * dx.toLong()
+            if (dxSq >= safetySq) return dialSide
+            val dyMin = kotlin.math.sqrt((safetySq - dxSq).toDouble()).toInt()
+            return maxOf(dialSide, h + centre + dyMin)
+        }
+        val containerHeight = maxOf(
+            requiredHeight(bezelP.width, bezelP.height),
+            requiredHeight(converterP.width, converterP.height)
+        )
+
+        val sideDp = dialSide.toDp()
+        val dialP = subcompose("dial") {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .bezelDragRotation { onBezelDrag(it) }
+            ) {
+                DialWithPushers(
+                    side = sideDp,
+                    rotation = rotation,
+                    chronoState = chronoState,
+                    chronoMillisProvider = chronoMillisProvider,
+                    onChronoStartStop = onChronoStartStop,
+                    onChronoReset = onChronoReset
+                )
+            }
+        }.first().measure(Constraints.fixed(dialSide, dialSide))
+
+        layout(parentWidth, containerHeight) {
+            dialP.placeRelative(0, 0)
+            bezelP.placeRelative(0, containerHeight - bezelP.height)
+            converterP.placeRelative(
+                parentWidth - converterP.width,
+                containerHeight - converterP.height
+            )
         }
     }
 }
@@ -344,7 +434,7 @@ private fun DialColumn(
 private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) {
     if (expanded) {
         // Full-screen scrim. Tapping the scrim does NOT dismiss — the
-        // user must use the explicit "Collapse" button so the dismissal
+        // user must use the explicit "Dismiss" button so the dismissal
         // is intentional (matches the user's spec). But the scrim MUST
         // absorb the tap so it doesn't fall through to underlying
         // composables (which would open keyboards / focus text fields).
@@ -358,27 +448,38 @@ private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) 
                     onClick = { /* swallow taps */ }
                 )
         ) {
+            // Layout: scrollable text region (takes weight 1f) above a
+            // pinned Dismiss row at the bottom. At very high font scales
+            // the text grows past one screen — the user can scroll it,
+            // but the Dismiss button is always visible at the bottom so
+            // the disclaimer is always reachable / dismissable.
             Column(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {
-                androidx.compose.material3.Text(
-                    text =
-                        "This app is an independent educational tool that demonstrates " +
-                        "how circular logarithmic slide-rule bezels work. It is not " +
-                        "affiliated with, endorsed by, sponsored by, or in any way " +
-                        "officially connected to any watch manufacturer or any brand. " +
-                        "All trademarks, trade names, and trade dress are the property " +
-                        "of their respective owners. No claim is made to any third-party " +
-                        "intellectual property. The dial, hands, sub-dials, markers, and " +
-                        "all other visual elements are generic representations of common " +
-                        "chronograph and slide-rule conventions and contain no copyrighted " +
-                        "assets belonging to any manufacturer.",
-                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
-                    color = androidx.compose.ui.graphics.Color(0xFFEAEAEA)
-                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    androidx.compose.material3.Text(
+                        text =
+                            "This app is an independent educational tool that demonstrates " +
+                            "how circular logarithmic slide-rule bezels work. It is not " +
+                            "affiliated with, endorsed by, sponsored by, or in any way " +
+                            "officially connected to any watch manufacturer or any brand. " +
+                            "All trademarks, trade names, and trade dress are the property " +
+                            "of their respective owners. No claim is made to any third-party " +
+                            "intellectual property. The dial, hands, sub-dials, markers, and " +
+                            "all other visual elements are generic representations of common " +
+                            "chronograph and slide-rule conventions and contain no copyrighted " +
+                            "assets belonging to any manufacturer.",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                        color = androidx.compose.ui.graphics.Color(0xFFEAEAEA)
+                    )
+                }
                 Spacer(Modifier.size(16.dp))
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Spacer(Modifier.weight(1f))
@@ -386,18 +487,11 @@ private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) 
                 }
             }
         }
-    } else {
-        // Collapsed: small chip pinned to top-left. Sits just BELOW the
-        // Reset chip's vertical position. Doesn't overlap the Examples
-        // arc which is to its right.
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 12.dp, top = 64.dp)
-        ) {
-            DisclaimerToggleChip(label = "Disclaimer", onClick = onToggle)
-        }
     }
+    // Collapsed state intentionally renders nothing. The disclaimer
+    // popup appears once at app launch and is dismissed by the user;
+    // re-surfacing it would clutter the watch face area, and the
+    // disclaimer text is preserved in the app's static documentation.
 }
 
 @Composable

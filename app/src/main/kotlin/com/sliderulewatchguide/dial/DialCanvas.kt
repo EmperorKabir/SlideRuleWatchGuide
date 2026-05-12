@@ -130,17 +130,11 @@ private fun StaticDial(measurer: TextMeasurer, modifier: Modifier) {
         drawSubDialFaces(g, measurer)
         drawDialHourIndices(g)
         drawCrownAndPushers(g)
-        // Backstop: thin dark stroke at rChapterInner (chapter-ring /
-        // dial boundary). Drawn LAST so it sits on top of anything that
-        // might bleed across the boundary from either side at high
-        // system font scale. The font-scale cap already prevents most
-        // bleed; this is belt-and-suspenders.
-        drawCircle(
-            color = DialPalette.BezelInsertBlack,
-            radius = g.rChapterInner,
-            center = g.center,
-            style = Stroke(width = g.rOuter * 0.006f)
-        )
+        // (Inner-border backstop removed — with fontScale capped at 1.0
+        //  and chapter-ring numerals centred at midR there is no longer
+        //  any text bleed for it to mask, and as a visible 0.006·rOuter
+        //  band straddling the dial/chapter-ring boundary it was adding a
+        //  dark seam that didn't exist on the real watch.)
     }
 }
 
@@ -250,7 +244,11 @@ private fun DrawScope.geom(): DialGeom {
     // Shrink the watch a touch so the crown + angled pushers fit inside the
     // canvas (they protrude about 9% of r past the case at 2/3/4 o'clock).
     val rOuter = (minOf(w, h) / 2f) * 0.88f
-    val rBezelOuter = rOuter * 0.99f
+    // Bezel-outer step now sits at 0.985 r (was 0.99 r) so the thicker
+    // perimeter border (0.028 r) has clean radial room inside rOuter
+    // without overpainting the bezel face. Visually it's a sub-pixel
+    // change at typical dial sizes.
+    val rBezelOuter = rOuter * 0.985f
     // Step gap between rotating bezel and fixed chapter ring tightened from
     // 0.02 r to 0.005 r so the outer and inner ticks visually almost meet
     // across a hairline step (per photo image 16).
@@ -394,7 +392,7 @@ private fun DrawScope.drawCoinEdgeBaseplate(g: DialGeom) {
     // the crown / pushers, so those tabs visually break the border at
     // 2 and 4 o'clock instead of running straight through.
     drawCircle(color = DialPalette.BezelInsertBlack, radius = g.rOuter, center = g.center,
-        style = Stroke(width = g.rOuter * 0.024f))
+        style = Stroke(width = g.rOuter * 0.028f))
 }
 
 private fun DrawScope.drawBezelInsertRecess(g: DialGeom) {
@@ -510,7 +508,13 @@ private fun DrawScope.drawFixedChapterRing(g: DialGeom, measurer: TextMeasurer) 
     // boundary) and grow INWARD by length-per-rank — so each inner tick
     // touches the matching outer tick at the same scale value across the
     // hairline step gap, regardless of tick rank.
-    val numeralR = g.rChapterInner + width * 0.20f
+    // Numerals centred on the band (midR). Photo-faithful: on real
+    // chronograph chapter rings the inner-rehaut numerals sit roughly
+    // centred in the annulus. Previous value 0.20f put the numeral
+    // centre only 0.027·rOuter above rChapterInner, less than the glyph
+    // half-height (~0.039·rOuter) — so the digit tail extended past
+    // rChapterInner and was overpainted by drawDialBackground.
+    val numeralR = g.rChapterInner + width * 0.50f
     val tickOuterR = g.rChapterOuter
     // TALL and MEDIUM are the SAME length on inner too (matches the
     // outer-bezel rule and the photo). Stroke width is the differentiator.
@@ -1127,7 +1131,11 @@ private fun DrawScope.drawCrownAndPushers(g: DialGeom) {
     // whole control is OUTSIDE the watch face and does not overlap
     // the bezel scale. Border = 0.024 r stroke centred on rOuter, so
     // its outer edge is at rOuter × 1.012.
-    val anchorR = g.rOuter * 1.012f
+    // Border outer edge moved to rOuter × 1.014 to match the thickened
+    // perimeter border (now 0.028 r). Crown/pushers anchor here and
+    // grow OUTWARD from the watch face, not inward — keeping them
+    // entirely outside the bezel scale.
+    val anchorR = g.rOuter * 1.014f
     drawAngledChronoControl(g, angleFromNorthDeg = 60.0,                  // 2 o'clock — top pusher
         shaftLen = g.rOuter * 0.020f, shaftHalfW = g.rOuter * 0.030f,
         capDepth = g.rOuter * 0.060f, capHalfW = g.rOuter * 0.065f,

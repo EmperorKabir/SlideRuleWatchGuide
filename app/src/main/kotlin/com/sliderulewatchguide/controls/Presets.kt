@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,12 +20,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,54 +58,76 @@ fun CurvedPresets(
         "nm→km"  to { onSetAngle(DialMath.alignRotation(10.0, DialMath.NAUT_MARKER)) }
     )
 
-    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        // ----- LEFT: Reset on its own, slightly emphasised -----
-        Box(modifier = Modifier.padding(top = 6.dp)) {
-            TinyChip(
-                label = "Reset",
-                onClick = onReset,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                emphasised = true
-            )
-        }
-
-        Spacer(Modifier.width(4.dp))
-
-        // ----- RIGHT: arched chip row with EXAMPLES caption sitting LOW -----
-        Box(modifier = Modifier.fillMaxHeight().fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Top
-            ) {
-                examples.forEachIndexed { i, (label, onClick) ->
-                    val n = examples.size
-                    val t = i.toDouble() / (n - 1).coerceAtLeast(1) - 0.5
-                    val drop = (t * t * 176.0).dp
-                    TinyChip(
-                        label = label,
-                        onClick = onClick,
-                        fontSize = 16.sp,
-                        modifier = Modifier.offset(y = drop)
-                    )
-                }
-            }
-            // EXAMPLES caption nestled inside the arc.
-            Text(
-                "EXAMPLES",
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = 56.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 13.sp,
+    // Cap the font-scale just for the chip row. Outside this scope the
+    // system's fontScale keeps applying. With cap = 1.0, chip text never
+    // grows past its design size, so the chips can never spill out of
+    // their equal-width slots and touch each other at high accessibility
+    // text-size settings. At fontScale <= 1.0 (e.g. the user's phone) the
+    // cap is inert and the row renders identically to before.
+    val systemDensity = LocalDensity.current
+    val cappedDensity = remember(systemDensity) {
+        val capped = systemDensity.fontScale.coerceAtMost(1f)
+        if (capped == systemDensity.fontScale) systemDensity
+        else Density(density = systemDensity.density, fontScale = capped)
+    }
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
+        Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            // ----- LEFT: Reset on its own, slightly emphasised -----
+            Box(modifier = Modifier.padding(top = 6.dp)) {
+                TinyChip(
+                    label = "Reset",
+                    onClick = onReset,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.5.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                    emphasised = true
+                )
+            }
+
+            Spacer(Modifier.width(4.dp))
+
+            // ----- RIGHT: arched chip row with EXAMPLES caption sitting LOW -----
+            Box(modifier = Modifier.fillMaxHeight().fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    examples.forEachIndexed { i, (label, onClick) ->
+                        val n = examples.size
+                        val t = i.toDouble() / (n - 1).coerceAtLeast(1) - 0.5
+                        val drop = (t * t * 176.0).dp
+                        // Chips are content-sized — at fontScale <= 1.0 this
+                        // matches the original layout exactly. At higher font
+                        // scales the surrounding CompositionLocalProvider caps
+                        // the density so the chip text never grows past its
+                        // design size, which means content widths stay
+                        // constant and SpaceEvenly continues to keep chips
+                        // from touching each other no matter the user's
+                        // accessibility text-size setting.
+                        TinyChip(
+                            label = label,
+                            onClick = onClick,
+                            fontSize = 16.sp,
+                            modifier = Modifier.offset(y = drop)
+                        )
+                    }
+                }
+                // EXAMPLES caption nestled inside the arc.
+                Text(
+                    "EXAMPLES",
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = 56.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.5.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
