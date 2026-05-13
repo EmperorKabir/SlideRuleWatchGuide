@@ -2,6 +2,7 @@ package com.sliderulewatchguide.equations
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,13 +32,17 @@ fun BezelInputs(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
+        // "Input" header aligned to the left edge of the numerical text
+        // field. LabelledFieldRow defaults to labelWidthDp = 38 for the
+        // bezel inputs, so the field starts 38 dp from the row's left edge.
         Text(
             text = "Input",
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 38.dp)
         )
         LabelledFieldRow(
             label = "Outer",

@@ -2,6 +2,7 @@ package com.sliderulewatchguide.equations
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,13 +36,17 @@ fun ConverterInputs(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
+        // "Input" header aligned to the left edge of the numerical text
+        // field. The converter inputs use labelWidthDp = 44, so the field
+        // starts 44 dp from the row's left edge.
         Text(
             text = "Input",
             style = MaterialTheme.typography.labelSmall.copy(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
             ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 44.dp)
         )
         LabelledFieldRow(
             label = "Stat mi",
