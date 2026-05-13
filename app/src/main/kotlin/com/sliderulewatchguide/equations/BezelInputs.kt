@@ -2,10 +2,14 @@ package com.sliderulewatchguide.equations
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Outer / Inner pair on the bottom-LEFT corner gap of the watch. No
@@ -27,6 +31,14 @@ fun BezelInputs(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
+        Text(
+            text = "Input",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         LabelledFieldRow(
             label = "Outer",
             value = outer,
