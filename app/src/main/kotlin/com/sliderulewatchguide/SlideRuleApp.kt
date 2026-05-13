@@ -169,6 +169,7 @@ private fun DialColumn(
         CurvedPresets(
             onSetAngle = vm::setRotation,
             onReset = vm::reset,
+            onNudge = vm::nudgeToNearestInteger,
             modifier = Modifier.fillMaxWidth().height(96.dp)
         )
 
@@ -247,6 +248,7 @@ private fun WideLayout(
             CurvedPresets(
                 onSetAngle = vm::setRotation,
                 onReset = vm::reset,
+                onNudge = vm::nudgeToNearestInteger,
                 modifier = Modifier.fillMaxWidth().height(96.dp)
             )
         }.first().measure(Constraints(maxWidth = colW, maxHeight = presetsHpx))

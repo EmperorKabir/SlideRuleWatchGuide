@@ -663,7 +663,13 @@ private fun DrawScope.drawMphLabel(g: DialGeom, measurer: TextMeasurer) {
     val mphAngle = DialMath.drawAngleDeg(60.0)
     // Pushed further inward (closer to dial centre) so the new RED
     // MPH up-arrow has clear room above it.
-    val mphTextR = g.rChapterInner - g.rOuter * 0.085f
+    // MPH caption sits JUST under the red arrow's base. Offset reduced
+    // from 0.085 to 0.0135 r·outer — leaves a very thin sliver of dial
+    // visible between the bottom of the red arrow and the top of the
+    // MPH text. The 12 o'clock hour marker (drawn elsewhere) is
+    // extended upward by the same delta so its tip still meets the
+    // bottom of the MPH text cleanly.
+    val mphTextR = g.rChapterInner - g.rOuter * 0.0135f
     drawScaleNumeralUpright(
         measurer = measurer,
         text = "MPH",
@@ -967,9 +973,12 @@ private fun DrawScope.drawDialHourIndices(g: DialGeom) {
     for (h in 0 until 12) {
         val angle = h * 30.0 - 90.0
         if (h == 0) {
-            // 12 o'clock: single thin line, shortened so the MPH up-arrow
-            // and the MPH text on the chapter ring above are unobscured.
-            drawMarker(angle, rInShort, g.rDial * 0.82f, width * 0.28f)
+            // 12 o'clock: single thin line. Outer end extended from
+            // 0.82 → 0.92 r·dial so its tip meets the bottom of the
+            // (now-raised) MPH text. Same Δ as the MPH-text upward move
+            // in drawMphLabel, so the visual relationship between the
+            // marker and the caption stays consistent.
+            drawMarker(angle, rInShort, g.rDial * 0.92f, width * 0.28f)
         } else {
             drawMarker(angle, rInShort, rOut, width * 0.85f)
         }

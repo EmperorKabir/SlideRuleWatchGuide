@@ -48,6 +48,7 @@ import com.sliderulewatchguide.dial.DialMath
 fun CurvedPresets(
     onSetAngle: (Double) -> Unit,
     onReset: () -> Unit,
+    onNudge: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val examples = listOf(
@@ -72,14 +73,24 @@ fun CurvedPresets(
     }
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
         Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            // ----- LEFT: Reset on its own, slightly emphasised -----
-            Box(modifier = Modifier.padding(top = 6.dp)) {
+            // ----- LEFT: Reset stacked above the Nudge chip -----
+            Column(
+                modifier = Modifier.padding(top = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 TinyChip(
                     label = "Reset",
                     onClick = onReset,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
                     emphasised = true
+                )
+                Spacer(Modifier.height(6.dp))
+                TinyChip(
+                    label = "Nudge to nearest integer",
+                    onClick = onNudge,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
 
@@ -136,8 +147,9 @@ fun CurvedPresets(
 fun Presets(
     onSetAngle: (Double) -> Unit,
     onReset: () -> Unit,
+    onNudge: () -> Unit,
     modifier: Modifier = Modifier
-) = CurvedPresets(onSetAngle, onReset, modifier)
+) = CurvedPresets(onSetAngle, onReset, onNudge, modifier)
 
 /**
  * Compact chip with tight content-padding (~10 × 6 dp vs Material's
