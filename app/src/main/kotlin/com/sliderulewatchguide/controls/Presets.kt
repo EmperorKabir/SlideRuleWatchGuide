@@ -74,6 +74,10 @@ fun CurvedPresets(
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
         Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             // ----- LEFT: Reset stacked above the Nudge chip -----
+            // Both chips share the same fontSize so visual scale matches.
+            // The Nudge chip is width-constrained to roughly Reset's
+            // natural width so its label wraps onto multiple lines.
+            val chipFontSize = 18.sp
             Column(
                 modifier = Modifier.padding(top = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -81,7 +85,7 @@ fun CurvedPresets(
                 TinyChip(
                     label = "Reset",
                     onClick = onReset,
-                    fontSize = 18.sp,
+                    fontSize = chipFontSize,
                     fontWeight = FontWeight.SemiBold,
                     emphasised = true
                 )
@@ -89,8 +93,12 @@ fun CurvedPresets(
                 TinyChip(
                     label = "Nudge to nearest integer",
                     onClick = onNudge,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = chipFontSize,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.width(88.dp),
+                    maxLines = 4,
+                    softWrap = true,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
 
@@ -163,7 +171,10 @@ private fun TinyChip(
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 14.sp,
     fontWeight: FontWeight = FontWeight.Medium,
-    emphasised: Boolean = false
+    emphasised: Boolean = false,
+    maxLines: Int = 1,
+    softWrap: Boolean = false,
+    textAlign: androidx.compose.ui.text.style.TextAlign? = null
 ) {
     val haptics = LocalHapticFeedback.current
     val bgColor =
@@ -189,8 +200,9 @@ private fun TinyChip(
             fontSize = fontSize,
             fontWeight = fontWeight,
             color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            softWrap = false
+            maxLines = maxLines,
+            softWrap = softWrap,
+            textAlign = textAlign
         )
     }
 }
