@@ -20,15 +20,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Plain-English equation panel.
- *
- * Sections that have an alternative direction (Division, Multiplication,
- * Hours/Min/Sec) render two live answers: the primary in the theme's
- * primary colour, and the alternative in the tertiary colour.
- *
- * The km and nautical-km sections read values straight from the bezel.
- * The outer scale value above each marker is the answer; no textbook
- * conversion factor is re-applied. That's the point of the slide rule.
+ * Plain-English equation panel — brand-neutral variant of the Navitimer
+ * sibling. Marker labels read "Sta" / "Nau" (matching the dial's printed
+ * labels) instead of "STAT." / "NAUT.".
  */
 @Composable
 fun FloatingEquations(
@@ -63,7 +57,7 @@ fun FloatingEquations(
             fontWeight = FontWeight.Bold
         )
 
-        // ---------------- Factors of 10 (static note, applies to every section)
+        // ---------------- Factors of 10
         InfoSection(
             title = "Factors of 10",
             text =
@@ -74,41 +68,51 @@ fun FloatingEquations(
                 "tell you that."
         )
 
-        // ---------------- Division (with alternative direction)
+        // ---------------- Division
         Section(
             title = "Division",
             primaryExplanation =
                 "Pick a number on the outer ring. Turn the bezel so it lines " +
-                "up with a number on the inner ring. The bezel has just done " +
-                "a division for you. Read the answer above inner 10.",
+                "up with a number on the inner ring. The number on the outer " +
+                "bezel divided by the number on the inner bezel is shown " +
+                "above the inner 10 marker.",
             primaryLive = if (x != null && y != null && y != 0.0)
                 "Outer ${fmt(x)} ÷ inner ${fmt(y)} = ${fmt(x / y)}."
             else "Type Outer and Inner above to see the live answer.",
             altExplanation =
                 "Alternative: Line up an inner number with an outer number. " +
-                "The answer (inner ÷ outer) is the inner value below outer 10.",
+                "The answer (inner ÷ outer) is the inner value below the " +
+                "outer 10 marker.",
             altLive = if (y != null && x != null && x != 0.0)
                 "Inner ${fmt(y)} ÷ outer ${fmt(x)} = ${fmt(y / x)}."
             else null
         )
 
-        // ---------------- Multiplication (with alternative direction)
-        Section(
+        // ---------------- Multiplication (primary + reversed-lookup alt + div alt)
+        MultiSection(
             title = "Multiplication",
             primaryExplanation =
-                "Line up outer 10 with any number on the inner ring; that " +
-                "number becomes your multiplier. Pick a value on the inner " +
-                "side. Read the result on the outer side directly above it.",
+                "Line up the outer 10 marker with any number on the inner " +
+                "ring; that number becomes your multiplier. Pick a value on " +
+                "the inner bezel. Read the result on the outer bezel directly " +
+                "above it.",
             primaryLive = if (y != null)
                 "Bezel multiplier is ${fmt(k)}; inner ${fmt(y)} × ${fmt(k)} = ${fmt(y * k)}."
             else "Slide the bezel to set a multiplier; the live value will appear here.",
-            altExplanation =
+            alt1Explanation =
+                "Alternative: Line up the inner 10 marker with any number " +
+                "on the outer bezel; that number becomes your multiplier. " +
+                "Pick a value on the outer bezel. Read the result on the " +
+                "inner bezel directly below it.",
+            alt1Live = if (x != null && invK.isFinite())
+                "Bezel multiplier is ${fmt(k)}; outer ${fmt(x)} × ${fmt(k)} = ${fmt(x * k)} on inner."
+            else null,
+            alt2Explanation =
                 "Alternative (division by the same multiplier): the same " +
-                "alignment also divides. Pick a number on the outer ring; the " +
-                "inner value directly below it is that outer number divided by " +
-                "the multiplier. Multiplication and division share one bezel " +
-                "setting — switch direction to switch operation.",
-            altLive = if (x != null && invK.isFinite())
+                "alignment also divides. Pick a number on the outer bezel; " +
+                "the inner value directly below it is that outer number " +
+                "divided by the multiplier.",
+            alt2Live = if (x != null && invK.isFinite())
                 "Outer ${fmt(x)} ÷ ${fmt(k)} = ${fmt(x * invK)} on inner."
             else null
         )
@@ -118,9 +122,9 @@ fun FloatingEquations(
             title = "Speed in miles per hour",
             primaryExplanation =
                 "Speed is distance ÷ time, scaled to per hour. Line up your " +
-                "distance in miles on the outer ring with how long it took in " +
-                "minutes on the inner ring. The mph reading appears above the " +
-                "12 o'clock MPH index.",
+                "distance in miles on the outer bezel with time in minutes on " +
+                "the inner bezel. The mph reading appears above the 12 " +
+                "o'clock MPH index.",
             primaryLive = if (x != null && y != null && y != 0.0)
                 "${fmt(x)} ${unit(x, "mile", "miles")} in ${fmt(y)} " +
                 "${unit(y, "minute", "minutes")} = ${fmt(x / y * 60.0)} mph."
@@ -129,88 +133,85 @@ fun FloatingEquations(
             altLive = null
         )
 
-        // ---------------- Time (with distance-from-time alternative)
+        // ---------------- Time
         Section(
             title = "Time for a journey",
             primaryExplanation =
-                "First set the bezel to your speed: rotate it so the mph " +
-                "value lines up with the MPH index at 12 o'clock. The inner " +
-                "ring is now a minutes scale for that speed. Pick any " +
-                "distance on the outer ring. The journey time in minutes " +
-                "sits directly below it on the inner ring.",
+                "First set the outer bezel to your speed: rotate it so the " +
+                "mph value lines up with the MPH index at 12 o'clock. The " +
+                "inner bezel is now a minutes scale for that speed. Pick any " +
+                "distance on the outer bezel. The journey time in minutes " +
+                "sits directly below it on the inner bezel.",
             primaryLive = if (x != null && mph.isFinite() && mph > 0)
                 "At ${fmt(mph)} mph, ${fmt(x)} ${unit(x, "mile", "miles")} takes " +
                 "${fmt(x * 60.0 / mph)} ${unit(x * 60.0 / mph, "minute", "minutes")}."
             else "Set a speed on the dial to see how long a distance takes.",
             altExplanation =
                 "Alternative (distance from time): With the same speed " +
-                "alignment, pick a time in minutes on the inner ring. The " +
-                "outer value above it is how far you travel in that time at " +
-                "the set speed.",
+                "alignment, pick a time on the inner bezel. The outer value " +
+                "above it is how far you travel in that time at the set speed.",
             altLive = if (y != null && mph.isFinite() && mph > 0)
                 "At ${fmt(mph)} mph, ${fmt(y)} ${unit(y, "minute", "minutes")} covers " +
                 "${fmt(y * mph / 60.0)} ${unit(y * mph / 60.0, "mile", "miles")}."
             else null
         )
 
-        // ---------------- Statute miles ↔ km (with reverse direction)
+        // ---------------- Statute miles ↔ km
         Section(
-            title = "Miles to kilometres",
+            title = "Statute miles to kilometres",
             primaryExplanation =
-                "Line up your miles value on the outer ring with the small red " +
-                "Sta triangle. Read the kilometres above the KM marker.",
+                "Line up your miles value on the outer ring with the Sta " +
+                "marker. Read the kilometres above the KM marker.",
             primaryLive =
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")} = " +
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")}.",
             altExplanation =
                 "Reverse: with the same alignment, the outer value above " +
-                "any kilometre value on the inner ring is the equivalent in " +
-                "statute miles. Pick KM, read miles.",
+                "the KM marker is the equivalent in statute miles above the " +
+                "Sta marker.",
             altLive =
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")} = " +
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")}."
         )
 
-        // ---------------- Nautical miles ↔ km (with reverse direction)
+        // ---------------- Nautical miles ↔ km
         Section(
             title = "Nautical miles to kilometres",
             primaryExplanation =
-                "Line up your nautical mile value with the Nau triangle. " +
+                "Line up your nautical mile value with the Nau marker. " +
                 "Read the kilometres above the KM marker. Same trick as Sta, " +
                 "but for sea or air distances.",
             primaryLive =
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")} = " +
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")}.",
             altExplanation =
-                "Reverse: with the same alignment, the outer value above any " +
-                "kilometre value is the equivalent in nautical miles. Pick KM, " +
-                "read nautical miles.",
+                "Reverse: with the same alignment, the outer value above the " +
+                "KM marker is the equivalent in statute miles above the " +
+                "Nau marker.",
             altLive =
                 "${fmt(kmVal)} ${unit(kmVal, "kilometre", "kilometres")} = " +
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")}."
         )
 
-        // ---------------- Nautical miles ↔ Statute miles (with reverse)
+        // ---------------- Nautical miles ↔ Statute miles
         Section(
             title = "Nautical miles to statute miles",
             primaryExplanation =
-                "Line up your nautical mile value with the Nau triangle. " +
-                "Read the statute mile equivalent above the Sta triangle " +
+                "Line up your nautical mile value with the Nau marker. " +
+                "Read the statute mile equivalent above the Sta marker " +
                 "directly. One nautical mile is about 1.151 statute miles.",
             primaryLive =
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")} = " +
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")}.",
             altExplanation =
                 "Reverse: with the same alignment, pick a statute mile value " +
-                "and read the equivalent nautical miles above the Nau triangle. " +
-                "Useful for converting in either direction without re-aligning " +
-                "the bezel.",
+                "and read the equivalent nautical miles above the Nau marker.",
             altLive =
                 "${fmt(statVal)} ${unit(statVal, "statute mile", "statute miles")} = " +
                 "${fmt(nautVal)} ${unit(nautVal, "nautical mile", "nautical miles")}."
         )
 
-        // ---------------- Hours / Minutes / Seconds (with alternative)
+        // ---------------- Hours / Minutes / Seconds
         Section(
             title = "Hours, minutes and seconds",
             primaryExplanation =
@@ -296,6 +297,69 @@ private fun Section(
                 Spacer(Modifier.size(4.dp))
                 Text(
                     altLive, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MultiSection(
+    title: String,
+    primaryExplanation: String,
+    primaryLive: String,
+    alt1Explanation: String?,
+    alt1Live: String?,
+    alt2Explanation: String?,
+    alt2Live: String?
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            title, style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.size(2.dp))
+        Text(
+            primaryExplanation,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.size(4.dp))
+        Text(
+            primaryLive, style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        if (alt1Explanation != null) {
+            Spacer(Modifier.size(8.dp))
+            Text(
+                alt1Explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (alt1Live != null) {
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    alt1Live, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+        }
+        if (alt2Explanation != null) {
+            Spacer(Modifier.size(8.dp))
+            Text(
+                alt2Explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (alt2Live != null) {
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    alt2Live, style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.tertiary
                 )
