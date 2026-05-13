@@ -1,6 +1,8 @@
 package com.sliderulewatchguide.dial
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -116,7 +118,13 @@ fun WatchDial(
 
 @Composable
 private fun StaticDial(measurer: TextMeasurer, modifier: Modifier) {
-    Canvas(modifier = modifier) {
+    // Render the static dial into its own GPU RenderNode via
+    // graphicsLayer. Compose records the draw commands once and replays
+    // them each frame without re-executing the heavy draw lambda —
+    // ~90 coin-edge teeth, ~32 measurer.measure() text-layout calls
+    // and 3 sub-dials of guilloché rings no longer happen on every
+    // frame the live hands tick.
+    Canvas(modifier = modifier.graphicsLayer { }) {
         val g = geom()
         drawCoinEdgeBaseplate(g)
         drawBezelInsertRecess(g)
@@ -155,29 +163,34 @@ private fun LiveHandsLayer(
     chronoMillisProvider: () -> Long,
     modifier: Modifier
 ) {
-    // Refresh the dial state at 60 Hz with a plain delay-driven loop —
-    // produceState + delay reliably recomposes the LiveHandsLayer
-    // Canvas; we tried withFrameMillis and observed the seconds hand
-    // not advancing in emulator captures. drawSubDialSecondsHand /
-    // drawChronoSecondsHand quantise the visible angle to
-    // BEATS_PER_SECOND via floor(raw * BEATS) / BEATS so the hand
-    // still ticks discretely at the design beat rate.
+    // Poll the clock at 4× the visible beat rate (8 Hz beat → ~32 Hz
+    // poll, 31 ms delay) which is a generous Nyquist margin without
+    // wasting CPU on 60 Hz state updates that all map to the same
+    // ticked angle. drawSubDialSecondsHand / drawChrono* helpers
+    // quantise the visible angle to BEATS_PER_SECOND via
+    // floor(raw * BEATS) / BEATS, so the hand still ticks discretely
+    // at the design beat rate.
     val nowState: State<LocalDateTime> = produceState(initialValue = currentLocalDateTime()) {
         while (true) {
-            kotlinx.coroutines.delay(16L)
+            kotlinx.coroutines.delay(31L)
             value = currentLocalDateTime()
         }
     }
-    val now = nowState.value
-    Canvas(modifier = modifier) {
-        val g = geom()
-        val chronoMs = chronoMillisProvider()
-        drawSubDialSecondsHand(g, now)
-        drawChronoMinAndHourHands(g, chronoMs)
-        drawTimeHands(g, now)
-        drawChronoSecondsHand(g, chronoMs)
-        drawHandHub(g)
-    }
+    // Read `now` and chrono millis INSIDE the draw lambda so the
+    // composable itself does not recompose on each tick — only the
+    // draw phase re-runs.
+    Spacer(
+        modifier = modifier.drawBehind {
+            val now = nowState.value
+            val g = geom()
+            val chronoMs = chronoMillisProvider()
+            drawSubDialSecondsHand(g, now)
+            drawChronoMinAndHourHands(g, chronoMs)
+            drawTimeHands(g, now)
+            drawChronoSecondsHand(g, chronoMs)
+            drawHandHub(g)
+        }
+    )
 }
 
 private fun currentLocalDateTime(): LocalDateTime =

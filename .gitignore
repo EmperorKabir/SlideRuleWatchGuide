@@ -17,3 +17,8 @@ build/
 gradle/wrapper/gradle-wrapper.jar.lock
 sheet.html
 research/
+
+# Release signing — never commit the keystore or its credentials.
+/keystore.properties
+*.jks
+*.keystore

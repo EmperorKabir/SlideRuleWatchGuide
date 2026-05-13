@@ -54,6 +54,11 @@ fun SlideRuleApp() {
     val nautText by vm.nautInput.collectAsStateWithLifecycle()
     val kmText by vm.kmInput.collectAsStateWithLifecycle()
     val chronoState by vm.chronoState.collectAsStateWithLifecycle()
+    // Capture the chrono-ms method reference ONCE so Compose can treat
+    // the dial subtree as stable across recompositions (a fresh
+    // KFunction would otherwise be allocated on every parent change,
+    // forcing WatchDial / LiveHandsLayer to recompose unnecessarily).
+    val chronoMillis = remember(vm) { vm::currentChronoMs }
 
     // Disclaimer state lifted to the top level so it can render as an
     // overlay z-stacked OVER the main content. Underlying layout stays
@@ -83,7 +88,7 @@ fun SlideRuleApp() {
                 WideLayout(
                     rotation = rotation,
                     chronoState = chronoState,
-                    chronoMillisProvider = vm::currentChronoMs,
+                    chronoMillisProvider = chronoMillis,
                     outerText = outerText,
                     innerText = innerText,
                     statText = statText,
@@ -108,7 +113,7 @@ fun SlideRuleApp() {
                         modifier = Modifier.fillMaxWidth(),
                         rotation = rotation,
                         chronoState = chronoState,
-                        chronoMillisProvider = vm::currentChronoMs,
+                        chronoMillisProvider = chronoMillis,
                         outerText = outerText,
                         innerText = innerText,
                         statText = statText,
