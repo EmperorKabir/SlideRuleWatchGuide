@@ -155,17 +155,16 @@ private fun LiveHandsLayer(
     chronoMillisProvider: () -> Long,
     modifier: Modifier
 ) {
-    // Update the dial state once per Choreographer frame (~16 ms at 60 Hz,
-    // ~8 ms at 120 Hz). Compose's withFrameMillis is the idiomatic vsync-
-    // aligned animation tick — no sampling-rate question, no Nyquist
-    // aliasing. The drawSubDialSecondsHand / drawChronoSecondsHand
-    // functions then quantise the visible angle to BEATS_PER_SECOND
-    // via floor(raw * BEATS) / BEATS, so the hand ticks discretely at
-    // the design beat rate even though the underlying state updates
-    // every frame.
+    // Refresh the dial state at 60 Hz with a plain delay-driven loop —
+    // produceState + delay reliably recomposes the LiveHandsLayer
+    // Canvas; we tried withFrameMillis and observed the seconds hand
+    // not advancing in emulator captures. drawSubDialSecondsHand /
+    // drawChronoSecondsHand quantise the visible angle to
+    // BEATS_PER_SECOND via floor(raw * BEATS) / BEATS so the hand
+    // still ticks discretely at the design beat rate.
     val nowState: State<LocalDateTime> = produceState(initialValue = currentLocalDateTime()) {
         while (true) {
-            androidx.compose.runtime.withFrameMillis { /* wake on next frame */ }
+            kotlinx.coroutines.delay(16L)
             value = currentLocalDateTime()
         }
     }
