@@ -156,10 +156,20 @@ private fun LiveHandsLayer(
     chronoMillisProvider: () -> Long,
     modifier: Modifier
 ) {
+    // Poll cadence must oversample the beat rate or the time-seconds hand
+    // aliases visually (Nyquist). At 8 beats / second each beat is 125 ms,
+    // so polling at 250 ms only catches roughly every second beat. Tying
+    // the delay directly to BEATS_PER_SECOND keeps the visible tick rate
+    // correct regardless of the constant: chrono running → 4× oversample,
+    // chrono idle → 2× oversample plus margin for scheduler jitter.
+    val idleDelayMs = (1000L / (BEATS_PER_SECOND.toLong() * 2L))
+        .coerceAtLeast(30L)
+    val runningDelayMs = (1000L / (BEATS_PER_SECOND.toLong() * 4L))
+        .coerceAtLeast(16L)
     val nowState: State<LocalDateTime> = produceState(initialValue = currentLocalDateTime()) {
         while (true) {
             value = currentLocalDateTime()
-            delay(if (chronoState == ChronoState.RUNNING) 50L else 250L)
+            delay(if (chronoState == ChronoState.RUNNING) runningDelayMs else idleDelayMs)
         }
     }
     val now = nowState.value
