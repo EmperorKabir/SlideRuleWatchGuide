@@ -1,16 +1,27 @@
 package com.sliderulewatchguide.equations
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -21,8 +32,8 @@ import kotlin.math.roundToInt
 
 /**
  * Plain-English equation panel — brand-neutral variant of the Navitimer
- * sibling. Marker labels read "Sta" / "Nau" (matching the dial's printed
- * labels) instead of "STAT." / "NAUT.".
+ * sibling. Marker labels read "Sta" / "Nau" instead of "STAT." / "NAUT.".
+ * Every section is collapsible; default state expanded.
  */
 @Composable
 fun FloatingEquations(
@@ -36,11 +47,11 @@ fun FloatingEquations(
 ) {
     val k = DialMath.multiplierFromRotation(rotationDegrees)
     val invK = if (k > 0 && k.isFinite()) 1.0 / k else Double.NaN
+    val mOuter = DialMath.outerValueAtInner(DialMath.SCALE_MIN, rotationDegrees)
+    val mInner = DialMath.innerValueAtOuter(DialMath.SCALE_MIN, rotationDegrees)
     val x = outer.toDoubleOrNull()
     val y = inner.toDoubleOrNull()
     val mph = DialMath.outerValueAtInner(60.0, rotationDegrees)
-    val above60 = DialMath.outerValueAtInner(60.0, rotationDegrees)
-    val above36 = DialMath.outerValueAtInner(36.0, rotationDegrees)
     val statVal = statRead.toDoubleOrNull() ?: DialMath.STAT_MARKER
     val nautVal = nautRead.toDoubleOrNull() ?: DialMath.NAUT_MARKER
     val kmVal = kmRead.toDoubleOrNull() ?: DialMath.KM_MARKER
@@ -88,24 +99,28 @@ fun FloatingEquations(
             else null
         )
 
-        // ---------------- Multiplication (primary + reversed-lookup alt + div alt)
+        // ---------------- Multiplication (primary + reversed-lookup alt + division alt)
         MultiSection(
             title = "Multiplication",
             primaryExplanation =
-                "Line up the outer 10 marker with any number on the inner " +
-                "ring; that number becomes your multiplier. Pick a value on " +
-                "the inner bezel. Read the result on the outer bezel directly " +
-                "above it.",
-            primaryLive = if (y != null)
-                "Bezel multiplier is ${fmt(k)}; inner ${fmt(y)} × ${fmt(k)} = ${fmt(y * k)}."
-            else "Slide the bezel to set a multiplier; the live value will appear here.",
+                "Line up your desired multiplier on the outer bezel with the " +
+                "inner 10 marker. The outer value sitting above inner 10 is " +
+                "your outer multiplier. Pick any inner value; the outer " +
+                "value above it is inner × outer multiplier (apply factors " +
+                "of 10 as needed).",
+            primaryLive = if (y != null && mOuter.isFinite())
+                "Outer multiplier is ${fmt(mOuter)}; inner ${fmt(y)} × " +
+                "${fmt(mOuter)} = ${fmt(y * mOuter)}."
+            else "Slide the bezel and type an Inner value to see the live multiplication.",
             alt1Explanation =
-                "Alternative: Line up the inner 10 marker with any number " +
-                "on the outer bezel; that number becomes your multiplier. " +
-                "Pick a value on the outer bezel. Read the result on the " +
-                "inner bezel directly below it.",
-            alt1Live = if (x != null && invK.isFinite())
-                "Bezel multiplier is ${fmt(k)}; outer ${fmt(x)} × ${fmt(k)} = ${fmt(x * k)} on inner."
+                "Alternative (reversed lookup): Line up your desired " +
+                "multiplier on the inner ring with the outer 10 marker. The " +
+                "inner value sitting below outer 10 is your inner " +
+                "multiplier. Pick any outer value; the inner value below it " +
+                "is outer × inner multiplier (apply factors of 10 as needed).",
+            alt1Live = if (x != null && mInner.isFinite())
+                "Inner multiplier is ${fmt(mInner)}; outer ${fmt(x)} × " +
+                "${fmt(mInner)} = ${fmt(x * mInner)}."
             else null,
             alt2Explanation =
                 "Alternative (division by the same multiplier): the same " +
@@ -215,48 +230,75 @@ fun FloatingEquations(
         Section(
             title = "Hours, minutes and seconds",
             primaryExplanation =
-                "There are 60 seconds in a minute and 60 minutes in an hour, " +
-                "so 60 × 60 = 3600 seconds in an hour. That's why the red 36 " +
-                "marker matters; it stands for 3600. Line up your hours times " +
-                "ten on the outer ring against inner 10, the unit index. The " +
-                "minutes sit above inner 60. The seconds sit above inner 36. " +
-                "All in one move. For example, align outer 40 (= 4 hours) " +
-                "with inner 10. Above inner 60 reads 24 (= 240 minutes). " +
-                "Above inner 36 reads 14.4 (= 14,400 seconds).",
+                "There are 60 seconds in a minute and 60 minutes in an hour " +
+                "and 60 × 60 = 3600 seconds in an hour. That's why the red " +
+                "36 markers matter; they stand for 3600 which is useful for " +
+                "time equations. Line up your hours on the outer bezel " +
+                "against the inner 10 marker. The minutes then sit above " +
+                "inner 60 and the seconds sit above inner 36. For example, " +
+                "align outer 40 (= 4 hours) with inner 10. Above inner 60 " +
+                "reads 24 (= 240 minutes). Above inner 36 reads 14.4 " +
+                "(= 14,400 seconds).",
             primaryLive = "${fmt(k)} ${unit(k, "hour", "hours")} = " +
                 "${fmt(k * 60)} ${unit(k * 60, "minute", "minutes")} = " +
                 "${fmt(k * 3600)} ${unit(k * 3600, "second", "seconds")}.",
             altExplanation =
-                "Alternative (any anchor): the 36 and 60 markers sit on both " +
-                "the inner and outer rings, so you can drive the conversion " +
-                "from any of the three anchors (10, 60, 36). For example, " +
-                "given seconds, line the seconds value (÷ 1000) on the outer " +
-                "scale up to inner 36; the equivalent hours read above inner " +
-                "10. With 14,400 seconds aligned at inner 36 (outer reads " +
-                "14.4), inner 10 sits below outer 4 — that's 4 hours. The " +
-                "factor of 10 you need depends on the magnitude of the " +
-                "starting value (see Factors of 10 above).",
-            altLive =
-                "Bezel currently reads: above inner 60 → ${fmt(above60)}; " +
-                "above inner 36 → ${fmt(above36)}."
+                "Alternative: the 36 and 60 markers sit on both the inner " +
+                "and outer rings, so you can drive the conversion from any " +
+                "of the three anchors (10, 60, 36). For example, given " +
+                "seconds, line the seconds value (÷ 1000) on the outer scale " +
+                "up to inner 36; the equivalent hours read above inner 10. " +
+                "For example, with 14,400 seconds aligned at inner 36 " +
+                "(outer reads 14.4), inner 10 sits below outer 4 — that's " +
+                "4 hours. The factor of 10 you need depends on the magnitude " +
+                "of the starting value (see Factors of 10 above).",
+            altLive = "${fmt(k)} ${unit(k, "hour", "hours")} = " +
+                "${fmt(k * 60)} ${unit(k * 60, "minute", "minutes")} = " +
+                "${fmt(k * 3600)} ${unit(k * 3600, "second", "seconds")}."
+        )
+    }
+}
+
+@Composable
+private fun CollapsibleHeader(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Icon(
+            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
 @Composable
 private fun InfoSection(title: String, text: String) {
+    var expanded by rememberSaveable(title) { mutableStateOf(true) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            title, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.size(2.dp))
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        CollapsibleHeader(title, expanded) { expanded = !expanded }
+        if (expanded) {
+            Spacer(Modifier.size(2.dp))
+            Text(
+                text,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -268,38 +310,37 @@ private fun Section(
     altExplanation: String?,
     altLive: String?
 ) {
+    var expanded by rememberSaveable(title) { mutableStateOf(true) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            title, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.size(2.dp))
-        Text(
-            primaryExplanation,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.size(4.dp))
-        Text(
-            primaryLive, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        if (altExplanation != null) {
-            Spacer(Modifier.size(8.dp))
+        CollapsibleHeader(title, expanded) { expanded = !expanded }
+        if (expanded) {
+            Spacer(Modifier.size(2.dp))
             Text(
-                altExplanation,
+                primaryExplanation,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (altLive != null) {
-                Spacer(Modifier.size(4.dp))
+            Spacer(Modifier.size(4.dp))
+            Text(
+                primaryLive, style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (altExplanation != null) {
+                Spacer(Modifier.size(8.dp))
                 Text(
-                    altLive, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.tertiary
+                    altExplanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (altLive != null) {
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        altLive, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         }
     }
@@ -315,54 +356,53 @@ private fun MultiSection(
     alt2Explanation: String?,
     alt2Live: String?
 ) {
+    var expanded by rememberSaveable(title) { mutableStateOf(true) }
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            title, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(Modifier.size(2.dp))
-        Text(
-            primaryExplanation,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.size(4.dp))
-        Text(
-            primaryLive, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        if (alt1Explanation != null) {
-            Spacer(Modifier.size(8.dp))
+        CollapsibleHeader(title, expanded) { expanded = !expanded }
+        if (expanded) {
+            Spacer(Modifier.size(2.dp))
             Text(
-                alt1Explanation,
+                primaryExplanation,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (alt1Live != null) {
-                Spacer(Modifier.size(4.dp))
+            Spacer(Modifier.size(4.dp))
+            Text(
+                primaryLive, style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (alt1Explanation != null) {
+                Spacer(Modifier.size(8.dp))
                 Text(
-                    alt1Live, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.tertiary
+                    alt1Explanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (alt1Live != null) {
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        alt1Live, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
-        }
-        if (alt2Explanation != null) {
-            Spacer(Modifier.size(8.dp))
-            Text(
-                alt2Explanation,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (alt2Live != null) {
-                Spacer(Modifier.size(4.dp))
+            if (alt2Explanation != null) {
+                Spacer(Modifier.size(8.dp))
                 Text(
-                    alt2Live, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.tertiary
+                    alt2Explanation,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (alt2Live != null) {
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        alt2Live, style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
         }
     }
