@@ -7,11 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -75,19 +73,20 @@ fun CurvedPresets(
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
         Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             // ----- LEFT: Reset stacked above the Nudge chip -----
-            // The column is sized to IntrinsicSize.Min so its width
-            // tracks the widest non-breakable token across all child
-            // chips — i.e. the longest single word in "Nudge to nearest
-            // integer" plus the TinyChip horizontal padding. This means
-            // the Nudge label can never be clipped at any font scale
-            // (the column grows with the rendered text) while remaining
-            // narrow enough to leave the Examples arc room to the right.
-            // Reset stays content-sized inside that column.
+            // Fixed-dp column width chosen to fit the longest single
+            // word of "Nudge to nearest integer" with margin so the
+            // label wraps onto multiple lines without any token being
+            // clipped. The surrounding CompositionLocalProvider caps
+            // fontScale to 1.0, so 112dp is stable across every user
+            // accessibility font-size setting. Reset and Nudge both
+            // fillMaxWidth so they share the column's width; Nudge has
+            // unbounded maxLines + softWrap so the chip's HEIGHT grows
+            // with the wrapped line count.
             val chipFontSize = 18.sp
             Column(
                 modifier = Modifier
                     .padding(top = 6.dp)
-                    .width(IntrinsicSize.Min),
+                    .width(112.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 TinyChip(
@@ -95,7 +94,9 @@ fun CurvedPresets(
                     onClick = onReset,
                     fontSize = chipFontSize,
                     fontWeight = FontWeight.SemiBold,
-                    emphasised = true
+                    emphasised = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(Modifier.height(6.dp))
                 TinyChip(
@@ -104,7 +105,7 @@ fun CurvedPresets(
                     fontSize = chipFontSize,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.fillMaxWidth(),
-                    maxLines = 5,
+                    maxLines = Int.MAX_VALUE,
                     softWrap = true,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
@@ -113,7 +114,7 @@ fun CurvedPresets(
             Spacer(Modifier.width(4.dp))
 
             // ----- RIGHT: arched chip row with EXAMPLES caption sitting LOW -----
-            Box(modifier = Modifier.fillMaxHeight().fillMaxWidth()) {
+            Box(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopCenter)

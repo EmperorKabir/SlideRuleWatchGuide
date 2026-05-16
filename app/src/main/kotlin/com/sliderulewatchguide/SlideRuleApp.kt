@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -175,7 +174,7 @@ private fun DialColumn(
             onSetAngle = vm::setRotation,
             onReset = vm::reset,
             onNudge = vm::nudgeToNearestInteger,
-            modifier = Modifier.fillMaxWidth().height(96.dp)
+            modifier = Modifier.fillMaxWidth()
         )
 
         DialWithCornerInputs(
@@ -244,7 +243,6 @@ private fun WideLayout(
         val totalH = constraints.maxHeight
         val spacerPx = 12.dp.roundToPx()
         val colW = ((totalW - spacerPx) / 2).coerceAtLeast(0)
-        val presetsHpx = 96.dp.roundToPx()
         val dialBelowGapPx = 8.dp.roundToPx()
         val inputsBelowMarginPx = 8.dp.roundToPx()
         val rightColInputsGapPx = 10.dp.roundToPx()
@@ -254,9 +252,9 @@ private fun WideLayout(
                 onSetAngle = vm::setRotation,
                 onReset = vm::reset,
                 onNudge = vm::nudgeToNearestInteger,
-                modifier = Modifier.fillMaxWidth().height(96.dp)
+                modifier = Modifier.fillMaxWidth()
             )
-        }.first().measure(Constraints(maxWidth = colW, maxHeight = presetsHpx))
+        }.first().measure(Constraints(maxWidth = colW))
 
         val dialSize = colW
         val dialP = subcompose("dial") {
