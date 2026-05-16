@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -74,12 +75,19 @@ fun CurvedPresets(
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
         Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             // ----- LEFT: Reset stacked above the Nudge chip -----
-            // Both chips share the same fontSize so visual scale matches.
-            // The Nudge chip is width-constrained to roughly Reset's
-            // natural width so its label wraps onto multiple lines.
+            // The column is sized to IntrinsicSize.Min so its width
+            // tracks the widest non-breakable token across all child
+            // chips — i.e. the longest single word in "Nudge to nearest
+            // integer" plus the TinyChip horizontal padding. This means
+            // the Nudge label can never be clipped at any font scale
+            // (the column grows with the rendered text) while remaining
+            // narrow enough to leave the Examples arc room to the right.
+            // Reset stays content-sized inside that column.
             val chipFontSize = 18.sp
             Column(
-                modifier = Modifier.padding(top = 6.dp),
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .width(IntrinsicSize.Min),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 TinyChip(
@@ -95,8 +103,8 @@ fun CurvedPresets(
                     onClick = onNudge,
                     fontSize = chipFontSize,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.width(88.dp),
-                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 5,
                     softWrap = true,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
