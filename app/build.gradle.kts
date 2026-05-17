@@ -18,16 +18,25 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.sliderulewatchguide"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.sliderulewatchguide"
         minSdk = 30
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Ship only 64-bit ARM. Drops x86/x86_64 (emulator-only) and
+        // armeabi-v7a (legacy 32-bit phones) from the bundle. Modern
+        // Play-store devices are arm64-v8a; combined with Play's
+        // per-ABI AAB split, this minimises the native code surface
+        // shipped to end-user devices.
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -57,6 +66,13 @@ android {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
+            }
+            // Explicit NONE keeps native function names opaque in any
+            // crash report — no symbol table is generated or uploaded
+            // alongside the bundle. Play will surface a non-blocking
+            // "native debug symbols missing" warning; that is intended.
+            ndk {
+                debugSymbolLevel = "NONE"
             }
         }
     }

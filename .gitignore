@@ -22,3 +22,8 @@ research/
 /keystore.properties
 *.jks
 *.keystore
+
+/play-assets/
+/CHROME_PROMPT.md
+/_*.png
+
