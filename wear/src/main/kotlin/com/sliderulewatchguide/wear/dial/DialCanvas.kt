@@ -838,9 +838,14 @@ private fun DrawScope.drawSubDialFaces(g: DialGeom, measurer: TextMeasurer) {
         topLeft = Offset(dateTopLeft.x - 1.4f, dateTopLeft.y - 1.4f),
         size = Size(dateBoxW + 2.8f, dateBoxH + 2.8f))
     drawRect(color = Color(0xFF0A0A0A), topLeft = dateTopLeft, size = Size(dateBoxW, dateBoxH))
+    // Font scaled to 0.34 of subR (down from 0.42) so the digit's
+    // ascender + descender stays within the dateBoxH (= 0.50 × subR)
+    // window across every screen resolution and density. The fraction
+    // is what makes the rendering dynamic; subR derives from
+    // DialGeom and scales with the underlying dial.
     val l = measurer.measure(
         androidx.compose.ui.text.AnnotatedString(now.dayOfMonth.toString()),
-        TextStyle(color = Color.White, fontSize = (subR * 0.42f / density).sp,
+        TextStyle(color = Color.White, fontSize = (subR * 0.34f / density).sp,
             fontWeight = FontWeight.SemiBold)
     )
     drawText(textLayoutResult = l,

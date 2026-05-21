@@ -132,11 +132,12 @@ private fun BoxScope.ChronoPusherButtons(
         val sidePx = minOf(widthPx, heightPx)
         val halfPx = sidePx / 2f
         // Mirror DialGeom: rOuter = 0.88 × half-min-dim. Pusher centre
-        // sits at 0.65 × rOuter — between the right sub-dial (outer
+        // sits at 0.63 × rOuter — between the right sub-dial (outer
         // edge 0.455 × rOuter) and the chapter ring's inner edge
-        // (rChapterInner = 0.71 × rOuter), closer to the bezel.
+        // (rChapterInner = 0.71 × rOuter), with a small visible gap
+        // to the bezel.
         val rOuter = halfPx * 0.88f
-        val pusherRadiusPx = rOuter * 0.65f
+        val pusherRadiusPx = rOuter * 0.63f
         val cx = widthPx / 2f
         val cy = heightPx / 2f
         val tapPx = with(density) { PUSHER_TAP_DP.toPx() }

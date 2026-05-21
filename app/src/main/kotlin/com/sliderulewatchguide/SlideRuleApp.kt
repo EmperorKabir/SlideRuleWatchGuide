@@ -114,7 +114,8 @@ fun SlideRuleApp() {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     val sheetParentHeightDp = maxHeight
-                    var dialBottomDp by remember { mutableStateOf(0.dp) }
+                    var dialCircleBottomDp by remember { mutableStateOf(0.dp) }
+                    var inputsBottomDp by remember { mutableStateOf(0.dp) }
                     val density = LocalDensity.current
 
                     Column(
@@ -132,28 +133,37 @@ fun SlideRuleApp() {
                             nautText = nautText,
                             kmText = kmText,
                             vm = vm,
-                            onDialBottomYChanged = { px ->
-                                val newDp = with(density) { px.toDp() }
-                                if ((newDp - dialBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
-                                    dialBottomDp = newDp
+                            onDialBottomYChanged = { dialPx, inputsPx ->
+                                val newDial = with(density) { dialPx.toDp() }
+                                val newInputs = with(density) { inputsPx.toDp() }
+                                if ((newDial - dialCircleBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
+                                    dialCircleBottomDp = newDial
+                                }
+                                if ((newInputs - inputsBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
+                                    inputsBottomDp = newInputs
                                 }
                             },
                         )
                     }
-                    // P2 = sheet height that places its top just below the
-                    // dial. A small 8 dp gap keeps the sheet visually
-                    // separated from the dial's bottom edge.
+                    // Snap points derived dynamically from layout
+                    // measurements so they remain correct across screen
+                    // sizes, foldable transitions, and font-scale.
                     val gapBelowDial = 2.dp
-                    val midSnapDp = (sheetParentHeightDp - dialBottomDp - gapBelowDial)
+                    val gapBelowInputs = 4.dp
+                    val midSnapDp = (sheetParentHeightDp - dialCircleBottomDp - gapBelowDial)
                         .coerceAtLeast(56.dp)
-                    // The Scaffold + outer-Box vertical padding (8 dp)
-                    // already provides spacing above the sheet — no
-                    // extra topInset needed. The sheet's max height
-                    // equals the full BoxWithConstraints area.
+                    val inputsSnapDp = (sheetParentHeightDp - inputsBottomDp - gapBelowInputs)
+                        .coerceAtLeast(56.dp)
                     val fullSnapDp = sheetParentHeightDp.coerceAtLeast(midSnapDp)
                     StayAnywhereBottomSheet(
                         title = "Live equations",
-                        snapHeightsDp = listOf(56.dp, midSnapDp, fullSnapDp),
+                        // P1 peek, P_new just below input boxes, P_mid
+                        // just below dial circle, P_full. The sheet
+                        // de-duplicates and sorts internally, so any
+                        // collapses (e.g. inputs and dial close in
+                        // height) gracefully fall back to fewer
+                        // distinct snaps.
+                        snapHeightsDp = listOf(56.dp, inputsSnapDp, midSnapDp, fullSnapDp),
                         topInsetDp = 0.dp,
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -206,7 +216,7 @@ private fun DialColumn(
     nautText: String,
     kmText: String,
     vm: DialViewModel,
-    onDialBottomYChanged: ((Float) -> Unit)? = null,
+    onDialBottomYChanged: ((Float, Float) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -439,10 +449,13 @@ private fun DialWithCornerInputs(
     onChronoReset: () -> Unit,
     bezelInputs: @Composable () -> Unit,
     converterInputs: @Composable () -> Unit,
-    // Reports the dial's bottom Y in the layout's local coordinate
-    // space (i.e. y within this composable's parent). Used by the
-    // bottom sheet's mid-snap to place itself just below the dial.
-    dialBottomYReporter: ((Float) -> Unit)? = null,
+    // Reports the dial CIRCLE's visible bottom Y AND the bottom Y of
+    // the whole DialWithCornerInputs container (i.e. the bottom of
+    // the BezelInputs / ConverterInputs row). Both in the layout's
+    // local coordinate space. Used by the bottom sheet to compute
+    // two distinct snap points: one just below the dial circle, and
+    // one just below the input boxes.
+    dialBottomYReporter: ((Float, Float) -> Unit)? = null,
 ) {
     SubcomposeLayout(
         modifier = Modifier
@@ -450,12 +463,17 @@ private fun DialWithCornerInputs(
             .then(
                 if (dialBottomYReporter != null) {
                     Modifier.onGloballyPositioned { coords ->
-                        // dial sits at y=0 within this container with
-                        // size=parentWidth (square). Container's
-                        // position-in-parent + parentWidth = dial bottom.
+                        // Dial canvas: square, size = parentWidth.
+                        // Visible bezel outer radius = 0.88 × halfDim,
+                        // so the circle's bottom edge sits at
+                        //   centreY + rOuter
+                        //   = (parentWidth / 2) + 0.88 × (parentWidth / 2)
+                        //   = 0.94 × parentWidth
+                        // measured from the canvas's top.
                         val containerTopY = coords.positionInParent().y
-                        val dialBottomYInParent = containerTopY + coords.size.width
-                        dialBottomYReporter(dialBottomYInParent)
+                        val circleBottomYInParent = containerTopY + coords.size.width * 0.87f
+                        val containerBottomYInParent = containerTopY + coords.size.height
+                        dialBottomYReporter(circleBottomYInParent, containerBottomYInParent)
                     }
                 } else Modifier
             )
