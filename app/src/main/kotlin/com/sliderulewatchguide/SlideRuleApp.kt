@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sliderulewatchguide.controls.CurvedPresets
+import com.sliderulewatchguide.controls.StayAnywhereBottomSheet
 import com.sliderulewatchguide.dial.WatchDial
 import com.sliderulewatchguide.dial.bezelDragRotation
 import com.sliderulewatchguide.equations.BezelInputs
@@ -98,42 +99,53 @@ fun SlideRuleApp() {
                 )
             } else {
                 // Compact / portrait: dial + buttons stay anchored at the
-                // top; the live equations panel is its own bounded scroll
-                // area at the bottom so the user can scroll the equations
-                // independently without losing sight of the watch.
-                Column(
+                // top; the live equations panel is a stay-anywhere bottom
+                // sheet the user can drag to any height. Peek bar shows a
+                // small "Live equations" title above the bottom edge.
+                // Dragging up reveals more; releasing leaves the sheet
+                // where the user let go (only snaps when very near the
+                // top or bottom of its travel).
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
-                    DialColumn(
-                        modifier = Modifier.fillMaxWidth(),
-                        rotation = rotation,
-                        chronoState = chronoState,
-                        chronoMillisProvider = chronoMillis,
-                        outerText = outerText,
-                        innerText = innerText,
-                        statText = statText,
-                        nautText = nautText,
-                        kmText = kmText,
-                        vm = vm
-                    )
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        FloatingEquations(
-                            rotationDegrees = rotation,
-                            outer = outerText,
-                            inner = innerText,
-                            statRead = statText,
-                            nautRead = nautText,
-                            kmRead = kmText
+                        DialColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            rotation = rotation,
+                            chronoState = chronoState,
+                            chronoMillisProvider = chronoMillis,
+                            outerText = outerText,
+                            innerText = innerText,
+                            statText = statText,
+                            nautText = nautText,
+                            kmText = kmText,
+                            vm = vm
                         )
+                    }
+                    StayAnywhereBottomSheet(
+                        title = "Live equations",
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 4.dp, vertical = 4.dp),
+                        ) {
+                            FloatingEquations(
+                                rotationDegrees = rotation,
+                                outer = outerText,
+                                inner = innerText,
+                                statRead = statText,
+                                nautRead = nautText,
+                                kmRead = kmText
+                            )
+                        }
                     }
                 }
             }

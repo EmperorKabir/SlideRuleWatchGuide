@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Slide Rule Watch Guide"
 include(":app")
+include(":wear")
