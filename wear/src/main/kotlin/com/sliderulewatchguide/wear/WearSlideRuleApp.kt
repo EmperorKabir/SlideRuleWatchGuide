@@ -31,8 +31,6 @@ import com.sliderulewatchguide.wear.dial.WatchDial
 import com.sliderulewatchguide.wear.dial.bezelDragRotation
 import com.sliderulewatchguide.wear.viewmodel.DialViewModel
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * Wear OS top-level UI — dial-only, no overlays.
@@ -59,6 +57,17 @@ import kotlin.math.sin
  */
 private const val SNAP_60_HALF_WIDTH_DEG = 1.82
 private const val PUSHER_RED = 0xFFD7263D
+
+// Pre-computed clock-angle trigonometry. The pushers always sit at
+// fixed angles relative to the dial centre — 75° for the top pusher
+// (between 2 and 3 hour markers) and 105° for the bottom (between 3
+// and 4) — so the sin/cos values are constants. Hoisting them to
+// file scope avoids re-evaluating Math.toRadians + sin/cos on every
+// recomposition.
+private val TOP_PUSHER_SIN = kotlin.math.sin(Math.toRadians(75.0)).toFloat()
+private val TOP_PUSHER_COS = kotlin.math.cos(Math.toRadians(75.0)).toFloat()
+private val BOT_PUSHER_SIN = kotlin.math.sin(Math.toRadians(105.0)).toFloat()
+private val BOT_PUSHER_COS = kotlin.math.cos(Math.toRadians(105.0)).toFloat()
 // Visual disc 14 dp (~10 % smaller than the 16 dp seen earlier) sits
 // just inside the chapter ring at radial 0.65 × rOuter. The
 // surrounding invisible tap-zone (24 dp) provides a standard-sized
@@ -145,12 +154,11 @@ private fun BoxScope.ChronoPusherButtons(
         // Clock-angle 75° (between 2 and 3 hour markers) — top pusher.
         // Clock-angle 105° (between 3 and 4 hour markers) — bottom pusher.
         // Screen coords: x = sin(angle), y = -cos(angle) (clock 0° = north).
-        val topAngleRad = Math.toRadians(75.0)
-        val botAngleRad = Math.toRadians(105.0)
-        val topX = cx + pusherRadiusPx * sin(topAngleRad).toFloat()
-        val topY = cy - pusherRadiusPx * cos(topAngleRad).toFloat()
-        val botX = cx + pusherRadiusPx * sin(botAngleRad).toFloat()
-        val botY = cy - pusherRadiusPx * cos(botAngleRad).toFloat()
+        // sin/cos values are constants — pre-computed at file scope.
+        val topX = cx + pusherRadiusPx * TOP_PUSHER_SIN
+        val topY = cy - pusherRadiusPx * TOP_PUSHER_COS
+        val botX = cx + pusherRadiusPx * BOT_PUSHER_SIN
+        val botY = cy - pusherRadiusPx * BOT_PUSHER_COS
 
         PusherButton(
             offsetXPx = topX - tapPx / 2,

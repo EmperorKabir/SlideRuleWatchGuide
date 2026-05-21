@@ -101,13 +101,12 @@ fun SlideRuleApp() {
                     vm = vm
                 )
             } else {
-                // Compact / portrait: dial + buttons stay anchored at the
-                // top; the live equations panel is a 3-snap-point bottom
-                // sheet. P1 = peek (only title bar visible). P2 = just
-                // below the dial (visible gap above the inputs row). P3
-                // = full extent, clearing only the system status bar.
-                // The middle snap height is computed at layout time from
-                // the dial's measured bottom Y.
+                // Compact / portrait: 5-snap-point live-equations sheet.
+                // P1 peek, P2 below input boxes, P3 below dial circle,
+                // P4 below chip buttons, P5 full extent. All four
+                // measured snaps derive from runtime layout values so
+                // they remain correct across screen sizes, font scales
+                // and foldable transitions.
                 BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()
@@ -227,7 +226,6 @@ private fun DialColumn(
     vm: DialViewModel,
     onDialBottomYChanged: ((Float, Float, Float) -> Unit)? = null,
 ) {
-    val density = LocalDensity.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         CurvedPresets(
             onSetAngle = vm::setRotation,
