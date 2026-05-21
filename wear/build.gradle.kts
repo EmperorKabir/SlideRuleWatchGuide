@@ -107,6 +107,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
 
+    // Required by the ported DialViewModel / DialCanvas (used by the
+    // chronograph clock and the live time-hands layer).
+    implementation(libs.kotlinx.datetime)
+
     // Wear-specific Compose libraries. Version-pinned here (not in the
     // shared catalog) because the phone module doesn't use them.
     // Using the stable wear-compose-material (not the alpha material3
