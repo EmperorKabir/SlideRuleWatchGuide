@@ -489,7 +489,7 @@ private fun DialWithCornerInputs(
                         //     with-corner-inputs container's bottom
                         //     (just below the input rows).
                         val chipsBottomY = containerTopY
-                        val circleBottomY = containerTopY + coords.size.width * 0.97f
+                        val circleBottomY = containerTopY + coords.size.width * 0.945f
                         val containerBottomY = containerTopY + coords.size.height
                         dialBottomYReporter(chipsBottomY, circleBottomY, containerBottomY)
                     }
