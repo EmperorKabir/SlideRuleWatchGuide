@@ -114,6 +114,7 @@ fun SlideRuleApp() {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     val sheetParentHeightDp = maxHeight
+                    var chipsBottomDp by remember { mutableStateOf(0.dp) }
                     var dialCircleBottomDp by remember { mutableStateOf(0.dp) }
                     var inputsBottomDp by remember { mutableStateOf(0.dp) }
                     val density = LocalDensity.current
@@ -133,9 +134,13 @@ fun SlideRuleApp() {
                             nautText = nautText,
                             kmText = kmText,
                             vm = vm,
-                            onDialBottomYChanged = { dialPx, inputsPx ->
+                            onDialBottomYChanged = { chipsPx, dialPx, inputsPx ->
+                                val newChips = with(density) { chipsPx.toDp() }
                                 val newDial = with(density) { dialPx.toDp() }
                                 val newInputs = with(density) { inputsPx.toDp() }
+                                if ((newChips - chipsBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
+                                    chipsBottomDp = newChips
+                                }
                                 if ((newDial - dialCircleBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
                                     dialCircleBottomDp = newDial
                                 }
@@ -146,24 +151,28 @@ fun SlideRuleApp() {
                         )
                     }
                     // Snap points derived dynamically from layout
-                    // measurements so they remain correct across screen
-                    // sizes, foldable transitions, and font-scale.
+                    // measurements — scale across screen sizes,
+                    // foldable transitions and font-scale changes.
+                    val gapBelowChips = 2.dp
                     val gapBelowDial = 2.dp
                     val gapBelowInputs = 4.dp
+                    val chipsSnapDp = (sheetParentHeightDp - chipsBottomDp - gapBelowChips)
+                        .coerceAtLeast(56.dp)
                     val midSnapDp = (sheetParentHeightDp - dialCircleBottomDp - gapBelowDial)
                         .coerceAtLeast(56.dp)
                     val inputsSnapDp = (sheetParentHeightDp - inputsBottomDp - gapBelowInputs)
                         .coerceAtLeast(56.dp)
-                    val fullSnapDp = sheetParentHeightDp.coerceAtLeast(midSnapDp)
+                    val fullSnapDp = sheetParentHeightDp.coerceAtLeast(chipsSnapDp)
                     StayAnywhereBottomSheet(
                         title = "Live equations",
-                        // P1 peek, P_new just below input boxes, P_mid
-                        // just below dial circle, P_full. The sheet
-                        // de-duplicates and sorts internally, so any
-                        // collapses (e.g. inputs and dial close in
-                        // height) gracefully fall back to fewer
-                        // distinct snaps.
-                        snapHeightsDp = listOf(56.dp, inputsSnapDp, midSnapDp, fullSnapDp),
+                        // Ordered low to high sheet height:
+                        //   P1 peek (56 dp)
+                        //   P2 just below input boxes
+                        //   P3 just below dial circle
+                        //   P4 just below chip buttons (Nudge/Reset row)
+                        //   P5 full extent
+                        // The sheet de-duplicates and sorts internally.
+                        snapHeightsDp = listOf(56.dp, inputsSnapDp, midSnapDp, chipsSnapDp, fullSnapDp),
                         topInsetDp = 0.dp,
                         modifier = Modifier.fillMaxSize(),
                     ) {
@@ -216,7 +225,7 @@ private fun DialColumn(
     nautText: String,
     kmText: String,
     vm: DialViewModel,
-    onDialBottomYChanged: ((Float, Float) -> Unit)? = null,
+    onDialBottomYChanged: ((Float, Float, Float) -> Unit)? = null,
 ) {
     val density = LocalDensity.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -449,13 +458,12 @@ private fun DialWithCornerInputs(
     onChronoReset: () -> Unit,
     bezelInputs: @Composable () -> Unit,
     converterInputs: @Composable () -> Unit,
-    // Reports the dial CIRCLE's visible bottom Y AND the bottom Y of
-    // the whole DialWithCornerInputs container (i.e. the bottom of
-    // the BezelInputs / ConverterInputs row). Both in the layout's
-    // local coordinate space. Used by the bottom sheet to compute
-    // two distinct snap points: one just below the dial circle, and
-    // one just below the input boxes.
-    dialBottomYReporter: ((Float, Float) -> Unit)? = null,
+    // Reports three Y values used to seed the bottom sheet's snap
+    // points (all in the layout's local coordinate space):
+    //   1. Chip-column bottom Y (= dial-container top).
+    //   2. Dial circle visible bottom Y.
+    //   3. Dial container bottom Y (= just below the input rows).
+    dialBottomYReporter: ((Float, Float, Float) -> Unit)? = null,
 ) {
     SubcomposeLayout(
         modifier = Modifier
@@ -471,9 +479,19 @@ private fun DialWithCornerInputs(
                         //   = 0.94 × parentWidth
                         // measured from the canvas's top.
                         val containerTopY = coords.positionInParent().y
-                        val circleBottomYInParent = containerTopY + coords.size.width * 0.87f
-                        val containerBottomYInParent = containerTopY + coords.size.height
-                        dialBottomYReporter(circleBottomYInParent, containerBottomYInParent)
+                        // 3-tuple of layout Y values used by the bottom
+                        // sheet to seed snap points:
+                        //   - chipsBottomY: y of the chip-column's
+                        //     bottom (= top of the dial container).
+                        //   - circleBottomY: y of the visible dial
+                        //     chrome rim bottom (~92 % of canvas).
+                        //   - containerBottomY: y of the entire dial-
+                        //     with-corner-inputs container's bottom
+                        //     (just below the input rows).
+                        val chipsBottomY = containerTopY
+                        val circleBottomY = containerTopY + coords.size.width * 0.97f
+                        val containerBottomY = containerTopY + coords.size.height
+                        dialBottomYReporter(chipsBottomY, circleBottomY, containerBottomY)
                     }
                 } else Modifier
             )
