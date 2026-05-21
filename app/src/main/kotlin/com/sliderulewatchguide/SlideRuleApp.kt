@@ -146,12 +146,15 @@ fun SlideRuleApp() {
                     val gapBelowDial = 4.dp
                     val midSnapDp = (sheetParentHeightDp - dialBottomDp - gapBelowDial)
                         .coerceAtLeast(56.dp)
-                    val topInset = 28.dp
-                    val fullSnapDp = (sheetParentHeightDp - topInset).coerceAtLeast(midSnapDp)
+                    // The Scaffold + outer-Box vertical padding (8 dp)
+                    // already provides spacing above the sheet — no
+                    // extra topInset needed. The sheet's max height
+                    // equals the full BoxWithConstraints area.
+                    val fullSnapDp = sheetParentHeightDp.coerceAtLeast(midSnapDp)
                     StayAnywhereBottomSheet(
                         title = "Live equations",
                         snapHeightsDp = listOf(56.dp, midSnapDp, fullSnapDp),
-                        topInsetDp = topInset,
+                        topInsetDp = 0.dp,
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         Column(
