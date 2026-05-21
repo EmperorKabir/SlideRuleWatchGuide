@@ -59,7 +59,14 @@ import kotlin.math.sin
  */
 private const val SNAP_60_HALF_WIDTH_DEG = 1.82
 private const val PUSHER_RED = 0xFFD7263D
-private val PUSHER_SIZE_DP = 24.dp
+// Visual disc 14 dp (~10 % smaller than the 16 dp seen earlier) sits
+// just inside the chapter ring at radial 0.65 × rOuter. The
+// surrounding invisible tap-zone (24 dp) provides a standard-sized
+// touch target. Tap-zone outer edge stops at ~0.77 × rOuter, well
+// short of the rotating bezel at rBezelInner = 0.85 × rOuter, so
+// bezel drag gestures do not clash with pusher taps.
+private val PUSHER_VISUAL_DP = 14.dp
+private val PUSHER_TAP_DP = 24.dp
 
 @Composable
 fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
@@ -124,15 +131,15 @@ private fun BoxScope.ChronoPusherButtons(
         val heightPx = with(density) { maxHeight.toPx() }
         val sidePx = minOf(widthPx, heightPx)
         val halfPx = sidePx / 2f
-        // Mirror DialGeom: rOuter = 0.88 × half-min-dim; place pushers
-        // at ~85 % of rOuter, which lands them just inside the inner
-        // chapter ring's outer edge — sitting on the dial face between
-        // the hour-index batons. Tuned visually against image #4.
+        // Mirror DialGeom: rOuter = 0.88 × half-min-dim. Pusher centre
+        // sits at 0.65 × rOuter — between the right sub-dial (outer
+        // edge 0.455 × rOuter) and the chapter ring's inner edge
+        // (rChapterInner = 0.71 × rOuter), closer to the bezel.
         val rOuter = halfPx * 0.88f
-        val pusherRadiusPx = rOuter * 0.85f
+        val pusherRadiusPx = rOuter * 0.65f
         val cx = widthPx / 2f
         val cy = heightPx / 2f
-        val buttonPx = with(density) { PUSHER_SIZE_DP.toPx() }
+        val tapPx = with(density) { PUSHER_TAP_DP.toPx() }
 
         // Clock-angle 75° (between 2 and 3 hour markers) — top pusher.
         // Clock-angle 105° (between 3 and 4 hour markers) — bottom pusher.
@@ -144,27 +151,46 @@ private fun BoxScope.ChronoPusherButtons(
         val botX = cx + pusherRadiusPx * sin(botAngleRad).toFloat()
         val botY = cy - pusherRadiusPx * cos(botAngleRad).toFloat()
 
-        Box(
-            modifier = Modifier
-                .offset { IntOffset((topX - buttonPx / 2).toInt(), (topY - buttonPx / 2).toInt()) }
-                .size(PUSHER_SIZE_DP)
-                .clip(CircleShape)
-                .background(Color(PUSHER_RED))
-                .clickable {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onTopPusher()
-                }
+        PusherButton(
+            offsetXPx = topX - tapPx / 2,
+            offsetYPx = topY - tapPx / 2,
+            haptic = HapticFeedbackType.LongPress,
+            onClick = onTopPusher,
+            haptics = haptics,
         )
+        PusherButton(
+            offsetXPx = botX - tapPx / 2,
+            offsetYPx = botY - tapPx / 2,
+            haptic = HapticFeedbackType.TextHandleMove,
+            onClick = onBottomPusher,
+            haptics = haptics,
+        )
+    }
+}
+
+@Composable
+private fun PusherButton(
+    offsetXPx: Float,
+    offsetYPx: Float,
+    haptic: HapticFeedbackType,
+    onClick: () -> Unit,
+    haptics: androidx.compose.ui.hapticfeedback.HapticFeedback,
+) {
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(offsetXPx.toInt(), offsetYPx.toInt()) }
+            .size(PUSHER_TAP_DP)
+            .clickable {
+                haptics.performHapticFeedback(haptic)
+                onClick()
+            },
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
         Box(
             modifier = Modifier
-                .offset { IntOffset((botX - buttonPx / 2).toInt(), (botY - buttonPx / 2).toInt()) }
-                .size(PUSHER_SIZE_DP)
+                .size(PUSHER_VISUAL_DP)
                 .clip(CircleShape)
                 .background(Color(PUSHER_RED))
-                .clickable {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onBottomPusher()
-                }
         )
     }
 }

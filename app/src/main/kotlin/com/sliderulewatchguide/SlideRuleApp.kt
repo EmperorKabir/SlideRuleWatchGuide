@@ -143,7 +143,7 @@ fun SlideRuleApp() {
                     // P2 = sheet height that places its top just below the
                     // dial. A small 8 dp gap keeps the sheet visually
                     // separated from the dial's bottom edge.
-                    val gapBelowDial = 4.dp
+                    val gapBelowDial = 2.dp
                     val midSnapDp = (sheetParentHeightDp - dialBottomDp - gapBelowDial)
                         .coerceAtLeast(56.dp)
                     // The Scaffold + outer-Box vertical padding (8 dp)
