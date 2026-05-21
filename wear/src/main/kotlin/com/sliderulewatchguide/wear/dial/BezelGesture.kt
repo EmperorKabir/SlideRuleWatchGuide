@@ -17,7 +17,10 @@ import kotlin.math.hypot
  *
  * [onRotate] receives the delta angle in DEGREES clockwise.
  */
-fun Modifier.bezelDragRotation(onRotate: (Double) -> Unit): Modifier = composed {
+fun Modifier.bezelDragRotation(
+    onRotate: (Double) -> Unit,
+    onDragEnd: () -> Unit = {},
+): Modifier = composed {
     val state = remember { GestureState() }
     pointerInput(Unit) {
         detectDragGestures(
@@ -25,9 +28,6 @@ fun Modifier.bezelDragRotation(onRotate: (Double) -> Unit): Modifier = composed 
                 val center = Offset(size.width / 2f, size.height / 2f)
                 val radius = minOf(size.width, size.height) / 2f
                 val r = hypot(offset.x - center.x, offset.y - center.y)
-                // Larger touch target than the literal coin-edge so the bezel is
-                // easy to grab on small screens; drags inside the dial centre
-                // (sub-dial / wordmark area) are still ignored.
                 state.active = r >= radius * 0.62f && r <= radius * 1.10f
                 state.lastAngle = atan2((offset.y - center.y).toDouble(), (offset.x - center.x).toDouble())
                 state.center = center
@@ -37,15 +37,24 @@ fun Modifier.bezelDragRotation(onRotate: (Double) -> Unit): Modifier = composed 
                 val pos = change.position
                 val newAngle = atan2((pos.y - state.center.y).toDouble(), (pos.x - state.center.x).toDouble())
                 var delta = newAngle - state.lastAngle
-                // Wrap to (-PI, PI]
                 if (delta > PI) delta -= 2 * PI
                 if (delta < -PI) delta += 2 * PI
                 state.lastAngle = newAngle
                 onRotate(delta * 180.0 / PI)
                 change.consume()
             },
-            onDragEnd = { state.active = false },
-            onDragCancel = { state.active = false }
+            onDragEnd = {
+                if (state.active) {
+                    state.active = false
+                    onDragEnd()
+                }
+            },
+            onDragCancel = {
+                if (state.active) {
+                    state.active = false
+                    onDragEnd()
+                }
+            }
         )
     }
 }
