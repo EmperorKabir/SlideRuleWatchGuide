@@ -104,6 +104,11 @@ android {
 }
 
 dependencies {
+    // Embed the paired wear-OS APK so the phone AAB ships both
+    // form-factor artefacts under one Play Store listing. Play pushes
+    // the wear APK to a paired watch when the phone app installs.
+    wearApp(project(":wear"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

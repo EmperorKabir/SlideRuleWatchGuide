@@ -17,12 +17,16 @@ android {
     namespace = "com.sliderulewatchguide.wear"
     compileSdk = 35
 
+    // Paired-distribution: same applicationId as the phone module so
+    // Play treats the wear APK as the watch-form-factor artefact of the
+    // same app listing. versionCode + versionName MUST also match the
+    // phone — AGP rejects mismatched embedded-wear bundles.
     defaultConfig {
-        applicationId = "com.sliderulewatchguide.wear"
+        applicationId = "com.sliderulewatchguide"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

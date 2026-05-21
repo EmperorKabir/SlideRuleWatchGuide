@@ -3,9 +3,11 @@ package com.sliderulewatchguide.controls
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -33,20 +35,25 @@ import kotlinx.coroutines.launch
 /**
  * Bottom-anchored sheet that the user can drag to ANY vertical position
  * within its travel range. On release the sheet stays where it was left
- * — it only snaps to a limit when the user releases within
- * [snapThresholdDp] of the top or bottom limit. Outside that snap zone
- * the sheet stays free-floating, matching the Dribbble settings drawer
- * pattern requested by the tester.
+ * — it only snaps to a limit when the user releases within the snap
+ * threshold of the top or bottom limit.
  *
- * Sheet height = the visible portion above the bottom edge. Travel
- * range:
+ * Travel range:
  *   • min = [peekHeightDp] (only the drag-handle / title bar visible)
- *   • max = parent height − [topMarginDp] (leaves room at top for the
- *     status bar / dial chrome)
+ *   • max = parent height − [topMarginDp]
  *
- * Sheet content goes inside the [content] slot. The drag-handle area
- * is the only part that responds to vertical drag — the inner content
- * is free to scroll independently.
+ * Snap threshold:
+ *   • If [snapThresholdDp] is provided, it's used verbatim.
+ *   • Otherwise the threshold is computed dynamically as a fraction of
+ *     the actual travel distance (default 12 %), with a sensible floor
+ *     and ceiling so it never gets too small on tiny phones or too
+ *     large on tablets / foldables.
+ *
+ * The drag handle / title area also responds to **taps**: tapping when
+ * the sheet is more than halfway towards closed expands it fully;
+ * tapping when more than halfway expanded collapses it. Tap and drag
+ * coexist — Compose's gesture system routes large pointer movement to
+ * the dragger and small clicks to the clickable.
  */
 @Composable
 fun StayAnywhereBottomSheet(
@@ -54,7 +61,10 @@ fun StayAnywhereBottomSheet(
     modifier: Modifier = Modifier,
     peekHeightDp: Dp = 56.dp,
     topMarginDp: Dp = 80.dp,
-    snapThresholdDp: Dp = 64.dp,
+    snapThresholdDp: Dp? = null,
+    snapFraction: Float = 0.12f,
+    minSnapDp: Dp = 40.dp,
+    maxSnapDp: Dp = 120.dp,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -62,10 +72,19 @@ fun StayAnywhereBottomSheet(
         val parentHeightPx = with(density) { maxHeight.toPx() }
         val peekPx = with(density) { peekHeightDp.toPx() }
         val topMarginPx = with(density) { topMarginDp.toPx() }
-        val snapPx = with(density) { snapThresholdDp.toPx() }
 
         val minHeightPx = peekPx
         val maxHeightPx = (parentHeightPx - topMarginPx).coerceAtLeast(peekPx)
+        val travelPx = maxHeightPx - minHeightPx
+
+        // Snap threshold: explicit override beats the dynamic calculation.
+        val snapPx = if (snapThresholdDp != null) {
+            with(density) { snapThresholdDp.toPx() }
+        } else {
+            val floor = with(density) { minSnapDp.toPx() }
+            val ceil = with(density) { maxSnapDp.toPx() }
+            (travelPx * snapFraction).coerceIn(floor, ceil)
+        }
 
         val sheetHeightPx = remember(maxHeightPx) { Animatable(minHeightPx) }
         val scope = rememberCoroutineScope()
@@ -86,15 +105,30 @@ fun StayAnywhereBottomSheet(
                 ),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Drag-handle bar — captures vertical drag.
+                // Drag-handle area. Accepts BOTH vertical drag AND taps.
+                // Drag handler consumes pointer events when the user
+                // moves significantly; taps fall through to clickable.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(peekHeightDp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            // Toggle: if closer to collapsed, expand;
+                            // if closer to expanded, collapse.
+                            val midpoint = minHeightPx + travelPx / 2f
+                            val target = if (sheetHeightPx.value < midpoint) {
+                                maxHeightPx
+                            } else {
+                                minHeightPx
+                            }
+                            scope.launch { sheetHeightPx.animateTo(target) }
+                        }
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { delta ->
-                                // Vertical delta: positive = downward = SHRINK sheet.
                                 val newH = (sheetHeightPx.value - delta)
                                     .coerceIn(minHeightPx, maxHeightPx)
                                 scope.launch { sheetHeightPx.snapTo(newH) }
@@ -133,7 +167,6 @@ fun StayAnywhereBottomSheet(
                         modifier = Modifier.padding(top = 22.dp),
                     )
                 }
-                // Free content area below the drag handle.
                 Box(modifier = Modifier.fillMaxSize()) { content() }
             }
         }
