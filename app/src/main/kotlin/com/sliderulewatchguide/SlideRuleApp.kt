@@ -29,6 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -99,17 +102,21 @@ fun SlideRuleApp() {
                 )
             } else {
                 // Compact / portrait: dial + buttons stay anchored at the
-                // top; the live equations panel is a stay-anywhere bottom
-                // sheet the user can drag to any height. Peek bar shows a
-                // small "Live equations" title above the bottom edge.
-                // Dragging up reveals more; releasing leaves the sheet
-                // where the user let go (only snaps when very near the
-                // top or bottom of its travel).
-                Box(
+                // top; the live equations panel is a 3-snap-point bottom
+                // sheet. P1 = peek (only title bar visible). P2 = just
+                // below the dial (visible gap above the inputs row). P3
+                // = full extent, clearing only the system status bar.
+                // The middle snap height is computed at layout time from
+                // the dial's measured bottom Y.
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
+                    val sheetParentHeightDp = maxHeight
+                    var dialBottomDp by remember { mutableStateOf(0.dp) }
+                    val density = LocalDensity.current
+
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -124,11 +131,27 @@ fun SlideRuleApp() {
                             statText = statText,
                             nautText = nautText,
                             kmText = kmText,
-                            vm = vm
+                            vm = vm,
+                            onDialBottomYChanged = { px ->
+                                val newDp = with(density) { px.toDp() }
+                                if ((newDp - dialBottomDp).value.let { kotlin.math.abs(it) } > 0.5f) {
+                                    dialBottomDp = newDp
+                                }
+                            },
                         )
                     }
+                    // P2 = sheet height that places its top just below the
+                    // dial. A small 8 dp gap keeps the sheet visually
+                    // separated from the dial's bottom edge.
+                    val gapBelowDial = 4.dp
+                    val midSnapDp = (sheetParentHeightDp - dialBottomDp - gapBelowDial)
+                        .coerceAtLeast(56.dp)
+                    val topInset = 28.dp
+                    val fullSnapDp = (sheetParentHeightDp - topInset).coerceAtLeast(midSnapDp)
                     StayAnywhereBottomSheet(
                         title = "Live equations",
+                        snapHeightsDp = listOf(56.dp, midSnapDp, fullSnapDp),
+                        topInsetDp = topInset,
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         Column(
@@ -179,8 +202,10 @@ private fun DialColumn(
     statText: String,
     nautText: String,
     kmText: String,
-    vm: DialViewModel
+    vm: DialViewModel,
+    onDialBottomYChanged: ((Float) -> Unit)? = null,
 ) {
+    val density = LocalDensity.current
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         CurvedPresets(
             onSetAngle = vm::setRotation,
@@ -190,6 +215,8 @@ private fun DialColumn(
         )
 
         DialWithCornerInputs(
+            // capture dial-bottom-Y (presets height + dial diameter).
+            dialBottomYReporter = onDialBottomYChanged,
             rotation = rotation,
             chronoState = chronoState,
             chronoMillisProvider = chronoMillisProvider,
@@ -408,9 +435,28 @@ private fun DialWithCornerInputs(
     onChronoStartStop: () -> Unit,
     onChronoReset: () -> Unit,
     bezelInputs: @Composable () -> Unit,
-    converterInputs: @Composable () -> Unit
+    converterInputs: @Composable () -> Unit,
+    // Reports the dial's bottom Y in the layout's local coordinate
+    // space (i.e. y within this composable's parent). Used by the
+    // bottom sheet's mid-snap to place itself just below the dial.
+    dialBottomYReporter: ((Float) -> Unit)? = null,
 ) {
-    SubcomposeLayout(modifier = Modifier.fillMaxWidth()) { constraints ->
+    SubcomposeLayout(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (dialBottomYReporter != null) {
+                    Modifier.onGloballyPositioned { coords ->
+                        // dial sits at y=0 within this container with
+                        // size=parentWidth (square). Container's
+                        // position-in-parent + parentWidth = dial bottom.
+                        val containerTopY = coords.positionInParent().y
+                        val dialBottomYInParent = containerTopY + coords.size.width
+                        dialBottomYReporter(dialBottomYInParent)
+                    }
+                } else Modifier
+            )
+    ) { constraints ->
         val parentWidth = constraints.maxWidth
         check(parentWidth != Constraints.Infinity) {
             "DialWithCornerInputs requires bounded width"
