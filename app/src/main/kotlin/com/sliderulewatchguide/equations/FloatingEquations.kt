@@ -63,11 +63,6 @@ fun FloatingEquations(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(
-            "Live equations", style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold
-        )
-
         // ---------------- Factors of 10
         InfoSection(
             title = "Factors of 10",
