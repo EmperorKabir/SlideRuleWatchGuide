@@ -1,5 +1,7 @@
 package com.sliderulewatchguide
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +31,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -49,6 +55,29 @@ import com.sliderulewatchguide.equations.ConverterInputs
 import com.sliderulewatchguide.equations.FloatingEquations
 import com.sliderulewatchguide.viewmodel.DialViewModel
 
+// Remote-sync glow colour: subtle cyan, matching the wear side. Drawn as
+// an outer-edge ring on the phone dial (the wear side uses the inner
+// chapter-ring edge) when a bezel rotation arrives from the partner.
+private val SYNC_GLOW_COLOR = androidx.compose.ui.graphics.Color(0x804DD0E1)
+
+/**
+ * Outer-edge cyan glow overlay, alpha driven by [alpha] (0..1). Drawn at
+ * the visible bezel outer radius (0.88 of the half-dimension) so it reads
+ * as a halo around the dial. No-op when [alpha] is ~0.
+ */
+private fun Modifier.syncGlow(alpha: Float): Modifier = drawWithContent {
+    drawContent()
+    if (alpha <= 0.001f) return@drawWithContent
+    val side = kotlin.math.min(size.width, size.height)
+    val rOuter = side * 0.5f * 0.88f
+    drawCircle(
+        color = SYNC_GLOW_COLOR.copy(alpha = SYNC_GLOW_COLOR.alpha * alpha),
+        radius = rOuter,
+        center = Offset(size.width / 2f, size.height / 2f),
+        style = Stroke(width = side * 0.014f),
+    )
+}
+
 @Composable
 fun SlideRuleApp() {
     val vm: DialViewModel = viewModel()
@@ -65,6 +94,14 @@ fun SlideRuleApp() {
     // forcing WatchDial / LiveHandsLayer to recompose unnecessarily).
     val chronoMillis = remember(vm) { vm::currentChronoMs }
 
+    // Remote-sync glow: alpha pulsed on each phone-applied remote
+    // rotation — a subtle outer-edge cyan halo on the dial, mirroring
+    // the wear-side inner-edge glow (~150 ms fade). The pulse counter is
+    // declared BEFORE the sync binder so onRemoteRotation increments it
+    // directly.
+    val glow = remember { Animatable(0f) }
+    var remotePulse by remember { mutableStateOf(0) }
+
     // Bidirectional bezel sync with a paired Wear OS watch. Self-
     // activates when a partner is detected; the OFF toggle lives in
     // the dial's long-press menu. Incoming remote rotations are applied
@@ -76,9 +113,17 @@ fun SlideRuleApp() {
         onRemoteRotation = { remote ->
             if (kotlin.math.abs(remote - vm.rotationDegrees.value) > 0.05) {
                 vm.setRotation(remote)
+                remotePulse++
             }
         },
     )
+
+    LaunchedEffect(remotePulse) {
+        if (remotePulse > 0) {
+            glow.snapTo(1f)
+            glow.animateTo(0f, tween(durationMillis = 150))
+        }
+    }
 
     // Disclaimer state lifted to the top level so it can render as an
     // overlay z-stacked OVER the main content. Underlying layout stays
@@ -121,6 +166,7 @@ fun SlideRuleApp() {
                     nautText = nautText,
                     kmText = kmText,
                     equationsScroll = equationsScroll,
+                    glowAlpha = glow.value,
                     vm = vm
                 )
             } else {
@@ -155,6 +201,7 @@ fun SlideRuleApp() {
                             statText = statText,
                             nautText = nautText,
                             kmText = kmText,
+                            glowAlpha = glow.value,
                             vm = vm,
                             onDialBottomYChanged = { chipsPx, dialPx, inputsPx ->
                                 val newChips = with(density) { chipsPx.toDp() }
@@ -307,6 +354,7 @@ private fun DialColumn(
     statText: String,
     nautText: String,
     kmText: String,
+    glowAlpha: Float,
     vm: DialViewModel,
     onDialBottomYChanged: ((Float, Float, Float) -> Unit)? = null,
 ) {
@@ -324,6 +372,7 @@ private fun DialColumn(
             rotation = rotation,
             chronoState = chronoState,
             chronoMillisProvider = chronoMillisProvider,
+            glowAlpha = glowAlpha,
             onBezelDrag = vm::rotateBy,
             onChronoStartStop = vm::chronoStartStop,
             onChronoReset = vm::chronoReset,
@@ -379,6 +428,7 @@ private fun WideLayout(
     nautText: String,
     kmText: String,
     equationsScroll: androidx.compose.foundation.ScrollState,
+    glowAlpha: Float,
     vm: DialViewModel
 ) {
     SubcomposeLayout(modifier = Modifier.fillMaxSize().padding(12.dp)) { constraints ->
@@ -412,7 +462,8 @@ private fun WideLayout(
                     chronoState = chronoState,
                     chronoMillisProvider = chronoMillisProvider,
                     onChronoStartStop = vm::chronoStartStop,
-                    onChronoReset = vm::chronoReset
+                    onChronoReset = vm::chronoReset,
+                    glowAlpha = glowAlpha
                 )
             }
         }.first().measure(Constraints.fixed(dialSize, dialSize))
@@ -497,14 +548,15 @@ private fun DialWithPushers(
     chronoState: com.sliderulewatchguide.viewmodel.ChronoState,
     chronoMillisProvider: () -> Long,
     onChronoStartStop: () -> Unit,
-    onChronoReset: () -> Unit
+    onChronoReset: () -> Unit,
+    glowAlpha: Float = 0f
 ) {
     val haptics = LocalHapticFeedback.current
     WatchDial(
         bezelRotationDegrees = rotation,
         chronoState = chronoState,
         chronoMillisProvider = chronoMillisProvider,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize().syncGlow(glowAlpha)
     )
     // Top pusher tap target (start / stop)
     Box(modifier = Modifier
@@ -538,6 +590,7 @@ private fun DialWithCornerInputs(
     onBezelDrag: (Double) -> Unit,
     onChronoStartStop: () -> Unit,
     onChronoReset: () -> Unit,
+    glowAlpha: Float,
     bezelInputs: @Composable () -> Unit,
     converterInputs: @Composable () -> Unit,
     // Reports three Y values used to seed the bottom sheet's snap
@@ -621,7 +674,8 @@ private fun DialWithCornerInputs(
                     chronoState = chronoState,
                     chronoMillisProvider = chronoMillisProvider,
                     onChronoStartStop = onChronoStartStop,
-                    onChronoReset = onChronoReset
+                    onChronoReset = onChronoReset,
+                    glowAlpha = glowAlpha
                 )
             }
         }.first().measure(Constraints.fixed(dialSide, dialSide))
