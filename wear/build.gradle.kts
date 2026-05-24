@@ -32,6 +32,10 @@ android {
 
         ndk {
             abiFilters += listOf("arm64-v8a")
+            // Emulator testing on x86_64 hosts: `-PemuAbi` appends x86_64
+            // so native libs (graphics.path, datastore) load on the
+            // emulator. Distribution builds omit the flag → arm64-only.
+            if (project.hasProperty("emuAbi")) abiFilters += "x86_64"
         }
     }
 
