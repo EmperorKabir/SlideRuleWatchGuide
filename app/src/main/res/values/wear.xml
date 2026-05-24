@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Capability advertised to the paired device so each side can
+         discover the other for bezel synchronisation. Both the phone
+         and the wear module declare the SAME capability name. -->
+    <string-array name="android_wear_capabilities">
+        <item>sliderule_bezel_sync</item>
+    </string-array>
+</resources>

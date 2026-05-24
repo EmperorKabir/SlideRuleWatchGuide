@@ -1,25 +1,37 @@
 package com.sliderulewatchguide.wear
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -27,56 +39,40 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.wear.compose.material.Text
+import androidx.wear.compose.material.ToggleChip
+import androidx.wear.compose.material.ToggleChipDefaults
 import com.sliderulewatchguide.wear.dial.WatchDial
 import com.sliderulewatchguide.wear.dial.bezelDragRotation
+import com.sliderulewatchguide.wear.sync.rememberBezelSync
 import com.sliderulewatchguide.wear.viewmodel.DialViewModel
 import kotlin.math.abs
+import kotlin.math.min
 
-/**
- * Wear OS top-level UI — dial-only, no overlays.
- *
- * Identical phone-app dial via [WatchDial]. Two on-screen chronograph
- * pusher buttons sit between the hour markers at clock-angles 75° and
- * 105° (i.e. between 2/3 o'clock and between 3/4 o'clock). They are
- * drawn as red circular discs on top of the dial in z-order, so taps
- * always reach them regardless of which hand happens to be passing
- * over them visually.
- *
- *   • Top pusher  → vm.chronoStartStop()
- *   • Bottom pusher → vm.chronoReset()
- *
- * Bezel input:
- *   • Touch drag on the dial → rotates the bezel.
- *   • Galaxy Watch Classic rotary bezel → also rotates the bezel.
- *
- * Magnetic snap: on bezel-drag release, if the rotation is within
- * 1.82° of the canonical outer-60-at-inner-60 alignment (rotation =
- * 0°), the bezel snaps to exact 0°. That window corresponds to outer
- * values in [59.31, 60.70] sitting above the inner-60 anchor — the
- * angularly-symmetric equivalent of the user's [59.3, 60.7] request.
- */
 private const val SNAP_60_HALF_WIDTH_DEG = 1.82
 private const val PUSHER_RED = 0xFFD7263D
 
-// Pre-computed clock-angle trigonometry. The pushers always sit at
-// fixed angles relative to the dial centre — 75° for the top pusher
-// (between 2 and 3 hour markers) and 105° for the bottom (between 3
-// and 4) — so the sin/cos values are constants. Hoisting them to
-// file scope avoids re-evaluating Math.toRadians + sin/cos on every
-// recomposition.
 private val TOP_PUSHER_SIN = kotlin.math.sin(Math.toRadians(75.0)).toFloat()
 private val TOP_PUSHER_COS = kotlin.math.cos(Math.toRadians(75.0)).toFloat()
 private val BOT_PUSHER_SIN = kotlin.math.sin(Math.toRadians(105.0)).toFloat()
 private val BOT_PUSHER_COS = kotlin.math.cos(Math.toRadians(105.0)).toFloat()
-// Visual disc 14 dp (~10 % smaller than the 16 dp seen earlier) sits
-// just inside the chapter ring at radial 0.65 × rOuter. The
-// surrounding invisible tap-zone (24 dp) provides a standard-sized
-// touch target. Tap-zone outer edge stops at ~0.77 × rOuter, well
-// short of the rotating bezel at rBezelInner = 0.85 × rOuter, so
-// bezel drag gestures do not clash with pusher taps.
 private val PUSHER_VISUAL_DP = 14.dp
 private val PUSHER_TAP_DP = 24.dp
 
+// Remote-sync glow: a brief inner-edge cyan ring when the bezel
+// rotation arrived from the phone (not a local turn). Subtle, fades
+// over ~150 ms. Drawn at the chapter-ring inner radius.
+private val SYNC_GLOW_COLOR = Color(0x804DD0E1)
+
+/**
+ * Wear OS top-level UI — dial-only, no static chrome. Long-press the
+ * dial for the sync settings menu (the only non-dial affordance, and
+ * it's hidden until invoked, per spec).
+ *
+ * Chrono pushers + magnetic snap-to-60 as before. Adds bidirectional
+ * bezel sync with the paired phone: incoming rotations apply with an
+ * epsilon echo-guard and flash a subtle inner-edge glow.
+ */
 @Composable
 fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
     val rotation by vm.rotationDegrees.collectAsStateWithLifecycle()
@@ -84,6 +80,31 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    // Glow alpha pulsed on each remote-driven rotation. The pulse
+    // counter is declared BEFORE the sync binder so the onRemoteRotation
+    // callback can increment it directly.
+    val glow = remember { Animatable(0f) }
+    var remotePulse by remember { mutableStateOf(0) }
+    var showSyncMenu by remember { mutableStateOf(false) }
+
+    val syncState = rememberBezelSync(
+        rotationFlow = vm.rotationDegrees,
+        source = "wear",
+        onRemoteRotation = { remote ->
+            if (abs(remote - vm.rotationDegrees.value) > 0.05) {
+                vm.setRotation(remote)
+                remotePulse++
+            }
+        },
+    )
+
+    LaunchedEffect(remotePulse) {
+        if (remotePulse > 0) {
+            glow.snapTo(1f)
+            glow.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 150))
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -95,6 +116,9 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
                 vm.rotateBy(event.verticalScrollPixels.toDouble() / 6.0)
                 true
             }
+            .pointerInput(Unit) {
+                detectTapGestures(onLongPress = { showSyncMenu = true })
+            }
     ) {
         WatchDial(
             bezelRotationDegrees = rotation,
@@ -102,11 +126,10 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
             chronoMillisProvider = vm::currentChronoMs,
             modifier = Modifier
                 .fillMaxSize()
+                .syncGlow(glow.value)
                 .bezelDragRotation(
                     onRotate = { delta -> vm.rotateBy(delta) },
                     onDragEnd = {
-                        // Wrap rotation into (-180, 180] then snap to 0 if
-                        // within the magnetic window around outer-60.
                         val r = vm.rotationDegrees.value
                         val wrapped = if (r > 180.0) r - 360.0 else r
                         if (abs(wrapped) < SNAP_60_HALF_WIDTH_DEG) {
@@ -120,14 +143,82 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
             onTopPusher = { vm.chronoStartStop() },
             onBottomPusher = { vm.chronoReset() },
         )
+
+        if (showSyncMenu) {
+            SyncMenu(
+                syncEnabled = syncState.syncEnabled,
+                partnerAvailable = syncState.partnerAvailable,
+                onToggle = { syncState.setSyncEnabled(it) },
+                onDismiss = { showSyncMenu = false },
+            )
+        }
     }
 }
 
-/**
- * The two red chrono-pusher tap targets. Position is computed from the
- * dial's geometry constants so they scale automatically across any
- * round-watch resolution (Wear OS devices range ~390-480 px).
- */
+/** Inner-edge cyan glow overlay, alpha driven by [alpha] (0..1). */
+private fun Modifier.syncGlow(alpha: Float): Modifier = drawWithContent {
+    drawContent()
+    if (alpha <= 0.001f) return@drawWithContent
+    val side = min(size.width, size.height)
+    val rOuter = side * 0.5f * 0.88f
+    val rChapterInner = rOuter * 0.71f
+    drawCircle(
+        color = SYNC_GLOW_COLOR.copy(alpha = SYNC_GLOW_COLOR.alpha * alpha),
+        radius = rChapterInner,
+        center = Offset(size.width / 2f, size.height / 2f),
+        style = Stroke(width = side * 0.012f),
+    )
+}
+
+@Composable
+private fun BoxScope.SyncMenu(
+    syncEnabled: Boolean,
+    partnerAvailable: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xE6000000))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            ToggleChip(
+                checked = syncEnabled,
+                onCheckedChange = onToggle,
+                label = { Text("Sync bezel with phone") },
+                secondaryLabel = {
+                    Text(if (partnerAvailable) "Phone connected" else "No phone detected")
+                },
+                toggleControl = {
+                    androidx.wear.compose.material.Icon(
+                        imageVector = ToggleChipDefaults.switchIcon(syncEnabled),
+                        contentDescription = if (syncEnabled) "On" else "Off",
+                    )
+                },
+                colors = ToggleChipDefaults.toggleChipColors(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "Tap outside to close",
+                color = Color(0xFF8A8A8A),
+                modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun BoxScope.ChronoPusherButtons(
     onTopPusher: () -> Unit,
@@ -140,40 +231,19 @@ private fun BoxScope.ChronoPusherButtons(
         val heightPx = with(density) { maxHeight.toPx() }
         val sidePx = minOf(widthPx, heightPx)
         val halfPx = sidePx / 2f
-        // Mirror DialGeom: rOuter = 0.88 × half-min-dim. Pusher centre
-        // sits at 0.63 × rOuter — between the right sub-dial (outer
-        // edge 0.455 × rOuter) and the chapter ring's inner edge
-        // (rChapterInner = 0.71 × rOuter), with a small visible gap
-        // to the bezel.
         val rOuter = halfPx * 0.88f
         val pusherRadiusPx = rOuter * 0.63f
         val cx = widthPx / 2f
         val cy = heightPx / 2f
         val tapPx = with(density) { PUSHER_TAP_DP.toPx() }
 
-        // Clock-angle 75° (between 2 and 3 hour markers) — top pusher.
-        // Clock-angle 105° (between 3 and 4 hour markers) — bottom pusher.
-        // Screen coords: x = sin(angle), y = -cos(angle) (clock 0° = north).
-        // sin/cos values are constants — pre-computed at file scope.
         val topX = cx + pusherRadiusPx * TOP_PUSHER_SIN
         val topY = cy - pusherRadiusPx * TOP_PUSHER_COS
         val botX = cx + pusherRadiusPx * BOT_PUSHER_SIN
         val botY = cy - pusherRadiusPx * BOT_PUSHER_COS
 
-        PusherButton(
-            offsetXPx = topX - tapPx / 2,
-            offsetYPx = topY - tapPx / 2,
-            haptic = HapticFeedbackType.LongPress,
-            onClick = onTopPusher,
-            haptics = haptics,
-        )
-        PusherButton(
-            offsetXPx = botX - tapPx / 2,
-            offsetYPx = botY - tapPx / 2,
-            haptic = HapticFeedbackType.TextHandleMove,
-            onClick = onBottomPusher,
-            haptics = haptics,
-        )
+        PusherButton(topX - tapPx / 2, topY - tapPx / 2, HapticFeedbackType.LongPress, onTopPusher, haptics)
+        PusherButton(botX - tapPx / 2, botY - tapPx / 2, HapticFeedbackType.TextHandleMove, onBottomPusher, haptics)
     }
 }
 
@@ -193,7 +263,7 @@ private fun PusherButton(
                 haptics.performHapticFeedback(haptic)
                 onClick()
             },
-        contentAlignment = androidx.compose.ui.Alignment.Center,
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
