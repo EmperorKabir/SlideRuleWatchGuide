@@ -101,21 +101,34 @@ fun StayAnywhereBottomSheet(
         fun nearestSnap(current: Float): Float =
             snapPx.minBy { abs(it - current) }
 
-        // Choose the snap target on drag release. Below the velocity
-        // threshold the gesture is treated as a slow settle → closest snap
-        // to the release position. At/above it, the gesture is a directional
-        // swipe → step to the next configured snap in the drag direction,
-        // measured from the RELEASE height: a swipe up (sheet height grows,
-        // so screen-Y velocity is negative) lands on the first snap above
-        // the release height; a swipe down lands on the first snap below it.
-        // Speed decides direction only, never distance.
-        fun directionalSnap(releasedHeightPx: Float, releaseVelocityY: Float): Float {
-            if (abs(releaseVelocityY) < flingThresholdPx) return nearestSnap(releasedHeightPx)
-            return if (releaseVelocityY < 0f) {
-                // Swipe up → first snap strictly above the release height.
+        // A drag whose NET travel is below this (and whose release velocity
+        // is below the threshold) is treated as no real gesture → settle to
+        // nearest. Keeps an accidental few-pixel nudge from stepping.
+        val directionDeadzonePx = with(density) { 6.dp.toPx() }
+
+        // Choose the snap target on drag release. The step DIRECTION is taken
+        // from a clear flick (release velocity past the threshold) OR — when
+        // the finger decelerated before lifting, so the release velocity is
+        // ~0 — from the NET TRAVEL direction of the drag. This means even a
+        // slow, gentle drag steps in the direction it moved, with no minimum
+        // release speed required (high-refresh screens otherwise read a
+        // decelerating release as near-stationary). Sheet height grows when
+        // the finger moves UP, so up = negative screen-Y velocity / positive
+        // net height change. From the RELEASE height it lands on the first
+        // snap in that direction; a sub-deadzone, sub-threshold gesture
+        // settles to nearest. Speed/distance never affect HOW FAR it steps.
+        fun directionalSnap(releasedHeightPx: Float, dragStartHeightPx: Float, releaseVelocityY: Float): Float {
+            val net = releasedHeightPx - dragStartHeightPx
+            val up: Boolean = when {
+                abs(releaseVelocityY) >= flingThresholdPx -> releaseVelocityY < 0f
+                abs(net) >= directionDeadzonePx -> net > 0f
+                else -> return nearestSnap(releasedHeightPx)
+            }
+            return if (up) {
+                // Up → first snap strictly above the release height.
                 snapPx.firstOrNull { it > releasedHeightPx + 0.5f } ?: snapPx.last()
             } else {
-                // Swipe down → first snap strictly below the release height.
+                // Down → first snap strictly below the release height.
                 snapPx.lastOrNull { it < releasedHeightPx - 0.5f } ?: snapPx.first()
             }
         }
@@ -156,9 +169,11 @@ fun StayAnywhereBottomSheet(
                                     // No drag — it's a tap. Cycle to next snap.
                                     cycleToNextSnap()
                                 } else {
-                                    // It's a vertical drag. Track velocity
-                                    // across the drag so the release can
-                                    // decide snap-to-nearest vs fling-decay.
+                                    // It's a vertical drag. Remember the start
+                                    // height (for net-travel direction) and
+                                    // track velocity (for a flick) so the
+                                    // release can pick the step direction.
+                                    val dragStartHeight = sheetHeightPx.value
                                     val tracker = VelocityTracker()
                                     tracker.addPosition(dragChange.uptimeMillis, dragChange.position)
                                     verticalDrag(dragChange.id) { change ->
@@ -169,10 +184,11 @@ fun StayAnywhereBottomSheet(
                                         scope.launch { sheetHeightPx.snapTo(newH) }
                                         change.consume()
                                     }
-                                    // Release — snap to nearest (slow) or
-                                    // one detent in the swipe direction (fast).
+                                    // Release — step one detent in the drag
+                                    // direction (from flick velocity or, if it
+                                    // decelerated, net travel), else nearest.
                                     val releaseVelocityY = tracker.calculateVelocity().y
-                                    val target = directionalSnap(sheetHeightPx.value, releaseVelocityY)
+                                    val target = directionalSnap(sheetHeightPx.value, dragStartHeight, releaseVelocityY)
                                     if (target != sheetHeightPx.value) {
                                         scope.launch { sheetHeightPx.animateTo(target) }
                                     }
