@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -73,20 +74,18 @@ fun CurvedPresets(
     CompositionLocalProvider(LocalDensity provides cappedDensity) {
         Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             // ----- LEFT: Reset stacked above the Nudge chip -----
-            // Fixed-dp column width chosen to fit the longest single
-            // word of "Nudge to nearest integer" with margin so the
-            // label wraps onto multiple lines without any token being
-            // clipped. The surrounding CompositionLocalProvider caps
-            // fontScale to 1.0, so 112dp is stable across every user
-            // accessibility font-size setting. Reset and Nudge both
-            // fillMaxWidth so they share the column's width; Nudge has
-            // unbounded maxLines + softWrap so the chip's HEIGHT grows
-            // with the wrapped line count.
+            // Column width = IntrinsicSize.Min, so it self-sizes to the
+            // longest unbreakable token in its children ("integer" in
+            // "Nudge to nearest integer"). No magic dp number to retune if
+            // the label changes, and no token is ever clipped at any font
+            // scale. Reset and Nudge both fillMaxWidth so they share that
+            // intrinsic width; Nudge keeps unbounded maxLines + softWrap so
+            // its HEIGHT grows with the wrapped line count.
             val chipFontSize = 18.sp
             Column(
                 modifier = Modifier
                     .padding(top = 6.dp)
-                    .width(112.dp),
+                    .width(IntrinsicSize.Min),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 TinyChip(
