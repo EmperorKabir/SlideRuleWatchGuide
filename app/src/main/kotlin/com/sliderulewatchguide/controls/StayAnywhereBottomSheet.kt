@@ -74,7 +74,7 @@ fun StayAnywhereBottomSheet(
     modifier: Modifier = Modifier,
     peekHeightDp: Dp = 56.dp,
     topInsetDp: Dp = 28.dp,
-    flingVelocityThresholdDp: Dp = 100.dp,
+    flingVelocityThresholdDp: Dp = 50.dp,
     content: @Composable () -> Unit,
 ) {
     require(snapHeightsDp.isNotEmpty()) { "snapHeightsDp must contain at least one value" }

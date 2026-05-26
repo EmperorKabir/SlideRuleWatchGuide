@@ -152,13 +152,23 @@ class BezelSyncManager(
      *  current by [capabilityListener] and the start/refresh seed. */
     fun publishLive(degrees: Double) {
         if (!enabled) return
-        val nodes = cachedNodes
-        if (nodes.isEmpty()) return
         val ts = System.currentTimeMillis()
         lastLocalPublishMs = ts
         val payload = encode(degrees, ts)
         scope.launch {
             runCatching {
+                var nodes = cachedNodes
+                if (nodes.isEmpty()) {
+                    // Cache miss — e.g. the start() seed ran before the node
+                    // became reachable and no capability-change has fired
+                    // since (the partner was already connected at launch).
+                    // Query once and populate so live updates still flow;
+                    // the common case stays allocation/IPC-free via the cache.
+                    nodes = capabilityClient
+                        .getCapability(capability, CapabilityClient.FILTER_REACHABLE).await()
+                        .nodes
+                    if (nodes.isNotEmpty()) updateNodes(nodes)
+                }
                 for (node in nodes) {
                     messageClient.sendMessage(node.id, PATH_LIVE, payload)
                 }
