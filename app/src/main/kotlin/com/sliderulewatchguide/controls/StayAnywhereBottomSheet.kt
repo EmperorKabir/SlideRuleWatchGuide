@@ -107,6 +107,9 @@ fun StayAnywhereBottomSheet(
         // crosses slop — has a clear direction and steps (never bounces).
         val directionDeadzonePx = with(density) { 2.dp.toPx() }
 
+        fun nearestIndex(h: Float): Int =
+            snapPx.indices.minByOrNull { abs(snapPx[it] - h) } ?: 0
+
         // Choose the snap target on release. Step DIRECTION comes from the
         // finger's NET vertical travel from touch-down to release — robust to
         // brief flicks (crossing touch slop already implies a net move) and
@@ -114,22 +117,29 @@ fun StayAnywhereBottomSheet(
         // near-stationary, defeating velocity-only detection). Release
         // velocity is only a fallback for a degenerate ~zero-travel gesture.
         // Screen-Y decreases upward and the sheet grows upward, so an UP
-        // gesture has negative netY / negative velocity. From the release
-        // height it steps to the first snap in that direction; speed and
-        // distance never change HOW FAR it steps (always exactly one detent).
-        fun directionalSnap(releasedHeightPx: Float, pointerNetY: Float, releaseVelocityY: Float): Float {
+        // gesture has negative netY / negative velocity.
+        //
+        // The target is at LEAST one detent in the gesture direction (from the
+        // detent the drag STARTED at), but if the finger travelled further it
+        // honours the detent NEAREST the release. Picking the nearest detent
+        // (rather than the first one strictly past the release) widens each
+        // detent's catchment to the midpoint with its neighbour, so a small
+        // overshoot past a closely-spaced detent still lands on it instead of
+        // skipping to the next; a deliberate longer drag still multi-steps.
+        fun directionalSnap(
+            releasedHeightPx: Float, dragStartHeightPx: Float,
+            pointerNetY: Float, releaseVelocityY: Float,
+        ): Float {
             val up: Boolean = when {
                 abs(pointerNetY) >= directionDeadzonePx -> pointerNetY < 0f
                 abs(releaseVelocityY) >= flingThresholdPx -> releaseVelocityY < 0f
                 else -> return nearestSnap(releasedHeightPx)
             }
-            return if (up) {
-                // Up → first snap strictly above the release height.
-                snapPx.firstOrNull { it > releasedHeightPx + 0.5f } ?: snapPx.last()
-            } else {
-                // Down → first snap strictly below the release height.
-                snapPx.lastOrNull { it < releasedHeightPx - 0.5f } ?: snapPx.first()
-            }
+            val originIdx = nearestIndex(dragStartHeightPx)
+            val releaseIdx = nearestIndex(releasedHeightPx)
+            val targetIdx = if (up) maxOf(originIdx + 1, releaseIdx).coerceAtMost(snapPx.lastIndex)
+                            else minOf(originIdx - 1, releaseIdx).coerceAtLeast(0)
+            return snapPx[targetIdx]
         }
 
         fun cycleToNextSnap() {
@@ -175,6 +185,7 @@ fun StayAnywhereBottomSheet(
                                     // fallback). downY is the initial contact.
                                     val downY = down.position.y
                                     var lastY = dragChange.position.y
+                                    val dragStartHeight = sheetHeightPx.value
                                     val tracker = VelocityTracker()
                                     tracker.addPosition(dragChange.uptimeMillis, dragChange.position)
                                     verticalDrag(dragChange.id) { change ->
@@ -190,7 +201,7 @@ fun StayAnywhereBottomSheet(
                                     // direction (finger net travel, or flick
                                     // velocity), else nearest.
                                     val releaseVelocityY = tracker.calculateVelocity().y
-                                    val target = directionalSnap(sheetHeightPx.value, lastY - downY, releaseVelocityY)
+                                    val target = directionalSnap(sheetHeightPx.value, dragStartHeight, lastY - downY, releaseVelocityY)
                                     if (target != sheetHeightPx.value) {
                                         scope.launch { sheetHeightPx.animateTo(target) }
                                     }
