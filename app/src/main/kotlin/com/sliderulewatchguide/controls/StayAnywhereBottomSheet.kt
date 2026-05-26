@@ -101,27 +101,26 @@ fun StayAnywhereBottomSheet(
         fun nearestSnap(current: Float): Float =
             snapPx.minBy { abs(it - current) }
 
-        // A drag whose NET travel is below this (and whose release velocity
-        // is below the threshold) is treated as no real gesture → settle to
-        // nearest. Keeps an accidental few-pixel nudge from stepping.
-        val directionDeadzonePx = with(density) { 6.dp.toPx() }
+        // Smallest finger travel (touch-down -> release) that counts as a
+        // directional gesture. Kept BELOW the touch-slop distance so that
+        // ANY recognised drag — including a brief flick that only just
+        // crosses slop — has a clear direction and steps (never bounces).
+        val directionDeadzonePx = with(density) { 2.dp.toPx() }
 
-        // Choose the snap target on drag release. The step DIRECTION is taken
-        // from a clear flick (release velocity past the threshold) OR — when
-        // the finger decelerated before lifting, so the release velocity is
-        // ~0 — from the NET TRAVEL direction of the drag. This means even a
-        // slow, gentle drag steps in the direction it moved, with no minimum
-        // release speed required (high-refresh screens otherwise read a
-        // decelerating release as near-stationary). Sheet height grows when
-        // the finger moves UP, so up = negative screen-Y velocity / positive
-        // net height change. From the RELEASE height it lands on the first
-        // snap in that direction; a sub-deadzone, sub-threshold gesture
-        // settles to nearest. Speed/distance never affect HOW FAR it steps.
-        fun directionalSnap(releasedHeightPx: Float, dragStartHeightPx: Float, releaseVelocityY: Float): Float {
-            val net = releasedHeightPx - dragStartHeightPx
+        // Choose the snap target on release. Step DIRECTION comes from the
+        // finger's NET vertical travel from touch-down to release — robust to
+        // brief flicks (crossing touch slop already implies a net move) and
+        // to high-refresh screens (which read a decelerating release as
+        // near-stationary, defeating velocity-only detection). Release
+        // velocity is only a fallback for a degenerate ~zero-travel gesture.
+        // Screen-Y decreases upward and the sheet grows upward, so an UP
+        // gesture has negative netY / negative velocity. From the release
+        // height it steps to the first snap in that direction; speed and
+        // distance never change HOW FAR it steps (always exactly one detent).
+        fun directionalSnap(releasedHeightPx: Float, pointerNetY: Float, releaseVelocityY: Float): Float {
             val up: Boolean = when {
+                abs(pointerNetY) >= directionDeadzonePx -> pointerNetY < 0f
                 abs(releaseVelocityY) >= flingThresholdPx -> releaseVelocityY < 0f
-                abs(net) >= directionDeadzonePx -> net > 0f
                 else -> return nearestSnap(releasedHeightPx)
             }
             return if (up) {
@@ -169,26 +168,29 @@ fun StayAnywhereBottomSheet(
                                     // No drag — it's a tap. Cycle to next snap.
                                     cycleToNextSnap()
                                 } else {
-                                    // It's a vertical drag. Remember the start
-                                    // height (for net-travel direction) and
-                                    // track velocity (for a flick) so the
-                                    // release can pick the step direction.
-                                    val dragStartHeight = sheetHeightPx.value
+                                    // It's a vertical drag. Track the finger's
+                                    // net travel from the original touch-down
+                                    // (robust step direction — includes the
+                                    // slop-eaten portion) plus velocity (flick
+                                    // fallback). downY is the initial contact.
+                                    val downY = down.position.y
+                                    var lastY = dragChange.position.y
                                     val tracker = VelocityTracker()
                                     tracker.addPosition(dragChange.uptimeMillis, dragChange.position)
                                     verticalDrag(dragChange.id) { change ->
                                         tracker.addPosition(change.uptimeMillis, change.position)
+                                        lastY = change.position.y
                                         val delta = change.positionChange().y
                                         val newH = (sheetHeightPx.value - delta)
                                             .coerceIn(snapPx.first(), snapPx.last())
                                         scope.launch { sheetHeightPx.snapTo(newH) }
                                         change.consume()
                                     }
-                                    // Release — step one detent in the drag
-                                    // direction (from flick velocity or, if it
-                                    // decelerated, net travel), else nearest.
+                                    // Release — step one detent in the gesture
+                                    // direction (finger net travel, or flick
+                                    // velocity), else nearest.
                                     val releaseVelocityY = tracker.calculateVelocity().y
-                                    val target = directionalSnap(sheetHeightPx.value, dragStartHeight, releaseVelocityY)
+                                    val target = directionalSnap(sheetHeightPx.value, lastY - downY, releaseVelocityY)
                                     if (target != sheetHeightPx.value) {
                                         scope.launch { sheetHeightPx.animateTo(target) }
                                     }
