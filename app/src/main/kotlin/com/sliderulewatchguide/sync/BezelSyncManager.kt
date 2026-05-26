@@ -9,6 +9,7 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
+import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
@@ -78,8 +79,20 @@ class BezelSyncManager(
     // Timestamp of the most recent value we APPLIED from the partner.
     @Volatile private var lastAppliedRemoteMs = 0L
 
+    // Reachable nodes advertising [capability], cached so the 30 Hz
+    // publishLive path never awaits a getCapability() IPC round-trip per
+    // update. Kept current by the capability listener + seeded on
+    // start()/refreshCapability(). @Volatile: written on the listener/IO
+    // threads, read on the publish path.
+    @Volatile private var cachedNodes: Set<Node> = emptySet()
+
+    private fun updateNodes(nodes: Set<Node>) {
+        cachedNodes = nodes
+        _partnerAvailable.value = nodes.isNotEmpty()
+    }
+
     private val capabilityListener = CapabilityClient.OnCapabilityChangedListener { info ->
-        _partnerAvailable.value = info.nodes.isNotEmpty()
+        updateNodes(info.nodes)
     }
 
     private val messageListener = MessageClient.OnMessageReceivedListener { event: MessageEvent ->
@@ -107,7 +120,7 @@ class BezelSyncManager(
         scope.launch {
             runCatching {
                 val info = capabilityClient.getCapability(capability, CapabilityClient.FILTER_REACHABLE).await()
-                _partnerAvailable.value = info.nodes.isNotEmpty()
+                updateNodes(info.nodes)
             }
             runCatching { readLatestState() }
         }
@@ -129,22 +142,23 @@ class BezelSyncManager(
         scope.launch {
             runCatching {
                 val info = capabilityClient.getCapability(capability, CapabilityClient.FILTER_REACHABLE).await()
-                _partnerAvailable.value = info.nodes.isNotEmpty()
+                updateNodes(info.nodes)
             }
         }
     }
 
-    /** Live update (30 Hz path). Sends to every reachable capable node. */
+    /** Live update (30 Hz path). Sends to every cached reachable capable
+     *  node WITHOUT a per-call capability IPC — the node set is kept
+     *  current by [capabilityListener] and the start/refresh seed. */
     fun publishLive(degrees: Double) {
         if (!enabled) return
+        val nodes = cachedNodes
+        if (nodes.isEmpty()) return
         val ts = System.currentTimeMillis()
         lastLocalPublishMs = ts
         val payload = encode(degrees, ts)
         scope.launch {
             runCatching {
-                val nodes = capabilityClient
-                    .getCapability(capability, CapabilityClient.FILTER_REACHABLE).await()
-                    .nodes
                 for (node in nodes) {
                     messageClient.sendMessage(node.id, PATH_LIVE, payload)
                 }

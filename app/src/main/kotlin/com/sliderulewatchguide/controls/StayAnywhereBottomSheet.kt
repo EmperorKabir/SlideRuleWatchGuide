@@ -1,8 +1,6 @@
 package com.sliderulewatchguide.controls
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.calculateTargetValue
-import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -45,11 +43,14 @@ import kotlin.math.abs
  *     snap point upward, wrapping back to the lowest from the highest.
  *   • SLOW drag (release velocity below [flingVelocityThresholdDp] dp/s)
  *     snaps to the CLOSEST configured point on release.
- *   • FAST fling (release velocity at/above the threshold) runs a
- *     spline-decay simulation from the release position + velocity and
- *     snaps to whichever configured point is nearest the projected
- *     landing — so a hard fling can skip past intermediate snaps in the
- *     fling direction, matching scroll physics users expect.
+ *   • DIRECTIONAL swipe (release velocity at/above the threshold) snaps to
+ *     the next configured point in the DRAG DIRECTION, measured from the
+ *     position the finger was released at: a swipe up lands on the first
+ *     snap above the release height, a swipe down on the first snap below
+ *     it. Speed only decides direction, never distance — a gentle flick
+ *     and a hard fling both advance exactly one detent past the release
+ *     point. The threshold is kept low so a light, deliberate swipe is
+ *     enough to commit to the move.
  *
  * Both gestures are handled in a single [pointerInput] block via
  * [awaitEachGesture], using touch slop to disambiguate — Compose's
@@ -61,9 +62,10 @@ import kotlin.math.abs
  * `topInsetDp` carves out a small strip at the top of the screen so
  * the full-expand snap clears the status bar.
  *
- * `flingVelocityThresholdDp` is the release speed (in dp/s) above which
- * the fling-decay path is taken instead of snap-to-nearest. Expressed
- * in dp so it's invariant to display density.
+ * `flingVelocityThresholdDp` is the release speed (in dp/s) at/above which
+ * the directional one-step snap is taken instead of snap-to-nearest.
+ * Expressed in dp so it's invariant to display density. Kept low so a
+ * light deliberate swipe commits to a step.
  */
 @Composable
 fun StayAnywhereBottomSheet(
@@ -72,7 +74,7 @@ fun StayAnywhereBottomSheet(
     modifier: Modifier = Modifier,
     peekHeightDp: Dp = 56.dp,
     topInsetDp: Dp = 28.dp,
-    flingVelocityThresholdDp: Dp = 125.dp,
+    flingVelocityThresholdDp: Dp = 100.dp,
     content: @Composable () -> Unit,
 ) {
     require(snapHeightsDp.isNotEmpty()) { "snapHeightsDp must contain at least one value" }
@@ -93,9 +95,6 @@ fun StayAnywhereBottomSheet(
         val initialSnapPx = snapPx.first()
         val sheetHeightPx = remember(maxHeightPx, snapPx) { Animatable(initialSnapPx) }
         val scope = rememberCoroutineScope()
-        // Spline decay matches the platform scroll-friction curve, so the
-        // projected fling landing feels native across devices.
-        val decaySpec = rememberSplineBasedDecay<Float>()
 
         val sheetShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
 
@@ -103,16 +102,22 @@ fun StayAnywhereBottomSheet(
             snapPx.minBy { abs(it - current) }
 
         // Choose the snap target on drag release. Below the velocity
-        // threshold: closest snap to the rest position. At/above it:
-        // closest snap to the spline-decay projected landing (sheet
-        // height grows as the finger moves UP, hence the sign flip on
-        // the velocity).
-        fun flingTargetSnap(restHeightPx: Float, releaseVelocityY: Float): Float {
-            if (abs(releaseVelocityY) < flingThresholdPx) return nearestSnap(restHeightPx)
-            val heightVelocity = -releaseVelocityY
-            val projected = decaySpec.calculateTargetValue(restHeightPx, heightVelocity)
-                .coerceIn(snapPx.first(), snapPx.last())
-            return snapPx.minBy { abs(it - projected) }
+        // threshold the gesture is treated as a slow settle → closest snap
+        // to the release position. At/above it, the gesture is a directional
+        // swipe → step to the next configured snap in the drag direction,
+        // measured from the RELEASE height: a swipe up (sheet height grows,
+        // so screen-Y velocity is negative) lands on the first snap above
+        // the release height; a swipe down lands on the first snap below it.
+        // Speed decides direction only, never distance.
+        fun directionalSnap(releasedHeightPx: Float, releaseVelocityY: Float): Float {
+            if (abs(releaseVelocityY) < flingThresholdPx) return nearestSnap(releasedHeightPx)
+            return if (releaseVelocityY < 0f) {
+                // Swipe up → first snap strictly above the release height.
+                snapPx.firstOrNull { it > releasedHeightPx + 0.5f } ?: snapPx.last()
+            } else {
+                // Swipe down → first snap strictly below the release height.
+                snapPx.lastOrNull { it < releasedHeightPx - 0.5f } ?: snapPx.first()
+            }
         }
 
         fun cycleToNextSnap() {
@@ -165,9 +170,9 @@ fun StayAnywhereBottomSheet(
                                         change.consume()
                                     }
                                     // Release — snap to nearest (slow) or
-                                    // fling-decay landing (fast).
+                                    // one detent in the swipe direction (fast).
                                     val releaseVelocityY = tracker.calculateVelocity().y
-                                    val target = flingTargetSnap(sheetHeightPx.value, releaseVelocityY)
+                                    val target = directionalSnap(sheetHeightPx.value, releaseVelocityY)
                                     if (target != sheetHeightPx.value) {
                                         scope.launch { sheetHeightPx.animateTo(target) }
                                     }
