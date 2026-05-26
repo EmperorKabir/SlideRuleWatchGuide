@@ -73,7 +73,7 @@ private const val DIAL_FONT_SCALE_CEILING: Float = 1.0f
 
 @Composable
 fun WatchDial(
-    bezelRotationDegrees: Double,
+    rotationProvider: () -> Float,
     chronoState: ChronoState,
     chronoMillisProvider: () -> Long,
     modifier: Modifier = Modifier
@@ -102,7 +102,7 @@ fun WatchDial(
             StaticDial(measurer = measurer, modifier = Modifier.fillMaxSize())
             RotatingBezel(
                 measurer = measurer,
-                rotationDegrees = bezelRotationDegrees,
+                rotationProvider = rotationProvider,
                 modifier = Modifier.fillMaxSize()
             )
             LiveHandsLayer(
@@ -148,10 +148,10 @@ private fun StaticDial(measurer: TextMeasurer, modifier: Modifier) {
 @Composable
 private fun RotatingBezel(
     measurer: TextMeasurer,
-    rotationDegrees: Double,
+    rotationProvider: () -> Float,
     modifier: Modifier
 ) {
-    Canvas(modifier = modifier.graphicsLayer { rotationZ = rotationDegrees.toFloat() }) {
+    Canvas(modifier = modifier.graphicsLayer { rotationZ = rotationProvider() }) {
         val g = geom()
         drawRotatingBezelScale(g, measurer)
     }
