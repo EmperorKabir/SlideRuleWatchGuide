@@ -75,7 +75,14 @@ private val SYNC_GLOW_COLOR = Color(0x804DD0E1)
  */
 @Composable
 fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
-    val rotation by vm.rotationDegrees.collectAsStateWithLifecycle()
+    val rotationState = vm.rotationDegrees.collectAsStateWithLifecycle()
+    // Defer the bezel-rotation read to the draw/layer phase: changing
+    // rotation (rotary crown, drag, or sync) then only re-runs the
+    // RotatingBezel graphicsLayer transform instead of recomposing the dial.
+    val rotationProvider = remember { { rotationState.value.toFloat() } }
+    // Hoist the chrono-ms method reference once so WatchDial's param stays
+    // stable across recompositions (mirrors the phone app).
+    val chronoMillis = remember(vm) { vm::currentChronoMs }
     val chronoState by vm.chronoState.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
 
@@ -121,9 +128,9 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
             }
     ) {
         WatchDial(
-            bezelRotationDegrees = rotation,
+            rotationProvider = rotationProvider,
             chronoState = chronoState,
-            chronoMillisProvider = vm::currentChronoMs,
+            chronoMillisProvider = chronoMillis,
             modifier = Modifier
                 .fillMaxSize()
                 .syncGlow(glow.value)
