@@ -104,11 +104,26 @@ class DialViewModel : ViewModel() {
     // Nonsense input (empty, NaN, ≤0) is silently ignored — the bezel
     // does nothing and the field keeps the user's typed text.
 
-    fun setOuterText(s: String) { _outerInput.value = s }
-    fun setInnerText(s: String) { _innerInput.value = s }
+    // Outer/Inner edit LIVE: each keystroke re-aligns the bezel so the
+    // typed Outer sits over the typed Inner, refreshing every
+    // rotation-derived equation read-out as the user types (not only on
+    // commit). The text being edited is never rewritten mid-keystroke —
+    // liveAlignFromInputs touches rotation + marker reads only, so the
+    // cursor is left alone. The inner ring is fixed; "aligning" rotates
+    // the outer ring, which is why typing Inner still drives a rotation.
+    fun setOuterText(s: String) { _outerInput.value = s; liveAlignFromInputs() }
+    fun setInnerText(s: String) { _innerInput.value = s; liveAlignFromInputs() }
     fun setStatText(s: String)  { _statInput.value = s }
     fun setNautText(s: String)  { _nautInput.value = s }
     fun setKmText(s: String)    { _kmInput.value = s }
+
+    private fun liveAlignFromInputs() {
+        val x = _outerInput.value.toDoubleOrNull() ?: return
+        val y = _innerInput.value.toDoubleOrNull() ?: return
+        if (x <= 0 || y <= 0 || !x.isFinite() || !y.isFinite()) return
+        _rotationDegrees.value = DialMath.alignRotation(x, y)
+        refreshMarkersFromRotation()
+    }
 
     fun commitInputs() {
         val x = _outerInput.value.toDoubleOrNull() ?: return
@@ -134,6 +149,14 @@ class DialViewModel : ViewModel() {
         if (innerY != null && innerY > 0) {
             _outerInput.value = formatNum(DialMath.outerValueAtInner(innerY, rot))
         }
+        refreshMarkersFromRotation()
+    }
+
+    // Sta/Nau/KM read-outs only — never the Outer/Inner text. Used by the
+    // per-keystroke live align so the marker fields stay consistent with
+    // the rotation without disturbing the field being typed into.
+    private fun refreshMarkersFromRotation() {
+        val rot = _rotationDegrees.value
         _statInput.value = formatNum(DialMath.outerValueAtInner(DialMath.STAT_MARKER, rot))
         _nautInput.value = formatNum(DialMath.outerValueAtInner(DialMath.NAUT_MARKER, rot))
         _kmInput.value   = formatNum(DialMath.outerValueAtInner(DialMath.KM_MARKER,   rot))
