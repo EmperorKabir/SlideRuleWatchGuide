@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -150,6 +151,12 @@ fun SlideRuleApp() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // Edge-to-edge window: the frame is NOT auto-resized for the
+                // keyboard, so without this the system pans the whole window
+                // up on short screens and the top row slides under the status
+                // bar. imePadding lifts content above the IME instead, keeping
+                // the top anchored below the status bar inset.
+                .imePadding()
                 .background(MaterialTheme.colorScheme.background)
                 .pointerInput(Unit) {
                     detectTapGestures(onLongPress = { showSyncMenu = true })
