@@ -758,7 +758,14 @@ private fun BoxScope.DisclaimerOverlay(expanded: Boolean, onToggle: () -> Unit) 
                             "intellectual property. The dial, hands, sub-dials, markers, and " +
                             "all other visual elements are generic representations of common " +
                             "chronograph and slide-rule conventions and contain no copyrighted " +
-                            "assets belonging to any manufacturer.",
+                            "assets belonging to any manufacturer.\n\n" +
+                            "This app shows you many mathematical functions that can be " +
+                            "performed on pilot watches where a featured inner and outer " +
+                            "bezel act as a circular slide rule. A slide rule is an old " +
+                            "mathematical instrument used for mathematical calculations " +
+                            "before electronic resources were available. For example, this " +
+                            "could help a pilot or seafarer make relatively quick " +
+                            "calculations while on the move.",
                         style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                         color = androidx.compose.ui.graphics.Color(0xFFEAEAEA)
                     )
