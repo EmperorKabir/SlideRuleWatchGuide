@@ -316,9 +316,15 @@ private fun SyncSettingsSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
         ) {
             androidx.compose.material3.Text(
-                text = "Bezel sync",
+                text = "Wear OS Settings",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            androidx.compose.material3.Text(
+                text = "(if you have the app installed on a Wear OS device as well)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp, bottom = 4.dp),
             )
             Row(
                 modifier = Modifier
