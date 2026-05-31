@@ -24,7 +24,7 @@ android {
         applicationId = "com.sliderulewatchguide"
         minSdk = 30
         targetSdk = 35
-        versionCode = 7
+        versionCode = 8
         versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -108,10 +108,13 @@ android {
 }
 
 dependencies {
-    // Embed the paired wear-OS APK so the phone AAB ships both
-    // form-factor artefacts under one Play Store listing. Play pushes
-    // the wear APK to a paired watch when the phone app installs.
-    wearApp(project(":wear"))
+    // The watch app is NOT embedded here. Modern Wear OS (2.0+) ignores
+    // the legacy embedded micro-APK (the `wearApp(...)` mechanism). The
+    // :wear module is built and uploaded as its OWN app bundle to the
+    // SAME Play listing (same package + signing key) via Play's
+    // multi-APK form-factor delivery — its versionCode is independent of
+    // the phone's. See PLAYSTORE notes / CHROME_PROMPT for the two-bundle
+    // upload flow.
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
