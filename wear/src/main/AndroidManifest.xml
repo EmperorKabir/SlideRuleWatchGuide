@@ -4,13 +4,15 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
 
-    <!-- The slide-rule dial is a circular log-scale bezel; rendering
-         it on a square / rectangular face would crop the outer scale
-         and break the layout. Declaring round as required hides the
-         app from non-round Wear OS devices in Play Store. -->
+    <!-- The dial is designed for round faces, but round is declared
+         required="false": Google Play's Wear OS device targeting EXCLUDES
+         real round watches (Pixel Watch, Galaxy Watch, etc.) when round is
+         required="true", so hard-requiring it ships to zero devices. We
+         therefore do not filter on it (the app simply targets watches via
+         android.hardware.type.watch and renders for round faces). -->
     <uses-feature
         android:name="android.hardware.screen.round"
-        android:required="true" />
+        android:required="false" />
 
     <application
         android:allowBackup="false"
