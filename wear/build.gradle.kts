@@ -28,16 +28,21 @@ android {
         applicationId = "com.sliderulewatchguide"
         minSdk = 30
         targetSdk = 35
-        versionCode = 11
+        versionCode = 12
         versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            // Ship BOTH ARM ABIs. Most Wear OS watches (e.g. Galaxy Watch 4)
+            // run a 32-bit armeabi-v7a userspace and CANNOT run an
+            // arm64-only build; 64-bit watches run v7a via backward-compat.
+            // arm64-v8a is kept too (newer watches + Google's Sep-2026
+            // 64-bit requirement). The two native libs (graphics.path,
+            // datastore) ship in both ABIs.
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
             // Emulator testing on x86_64 hosts: `-PemuAbi` appends x86_64
-            // so native libs (graphics.path, datastore) load on the
-            // emulator. Distribution builds omit the flag → arm64-only.
+            // so the native libs load on the emulator.
             if (project.hasProperty("emuAbi")) abiFilters += "x86_64"
         }
     }
