@@ -1,6 +1,5 @@
 package com.sliderulewatchguide.wear
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -59,11 +58,6 @@ private val BOT_PUSHER_COS = kotlin.math.cos(Math.toRadians(105.0)).toFloat()
 private val PUSHER_VISUAL_DP = 14.dp
 private val PUSHER_TAP_DP = 24.dp
 
-// Remote-sync glow: a brief inner-edge cyan ring when the bezel
-// rotation arrived from the phone (not a local turn). Subtle, fades
-// over ~150 ms. Drawn at the chapter-ring inner radius.
-private val SYNC_GLOW_COLOR = Color(0x804DD0E1)
-
 /**
  * Wear OS top-level UI — dial-only, no static chrome. Long-press the
  * dial for the sync settings menu (the only non-dial affordance, and
@@ -71,7 +65,7 @@ private val SYNC_GLOW_COLOR = Color(0x804DD0E1)
  *
  * Chrono pushers + magnetic snap-to-60 as before. Adds bidirectional
  * bezel sync with the paired phone: incoming rotations apply with an
- * epsilon echo-guard and flash a subtle inner-edge glow.
+ * epsilon echo-guard.
  */
 @Composable
 fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
@@ -88,11 +82,6 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
-    // Glow alpha pulsed on each remote-driven rotation. The pulse
-    // counter is declared BEFORE the sync binder so the onRemoteRotation
-    // callback can increment it directly.
-    val glow = remember { Animatable(0f) }
-    var remotePulse by remember { mutableStateOf(0) }
     var showSyncMenu by remember { mutableStateOf(false) }
 
     val syncState = rememberBezelSync(
@@ -101,17 +90,9 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
         onRemoteRotation = { remote ->
             if (abs(remote - vm.rotationDegrees.value) > 0.05) {
                 vm.setRotation(remote)
-                remotePulse++
             }
         },
     )
-
-    LaunchedEffect(remotePulse) {
-        if (remotePulse > 0) {
-            glow.snapTo(1f)
-            glow.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 150))
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -133,7 +114,6 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
             chronoMillisProvider = chronoMillis,
             modifier = Modifier
                 .fillMaxSize()
-                .syncGlow(glow.value)
                 .bezelDragRotation(
                     onRotate = { delta -> vm.rotateBy(delta) },
                     onDragEnd = {
@@ -160,21 +140,6 @@ fun WearSlideRuleApp(vm: DialViewModel = viewModel()) {
             )
         }
     }
-}
-
-/** Inner-edge cyan glow overlay, alpha driven by [alpha] (0..1). */
-private fun Modifier.syncGlow(alpha: Float): Modifier = drawWithContent {
-    drawContent()
-    if (alpha <= 0.001f) return@drawWithContent
-    val side = min(size.width, size.height)
-    val rOuter = side * 0.5f * 0.88f
-    val rChapterInner = rOuter * 0.71f
-    drawCircle(
-        color = SYNC_GLOW_COLOR.copy(alpha = SYNC_GLOW_COLOR.alpha * alpha),
-        radius = rChapterInner,
-        center = Offset(size.width / 2f, size.height / 2f),
-        style = Stroke(width = side * 0.012f),
-    )
 }
 
 @Composable
