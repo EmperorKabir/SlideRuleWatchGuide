@@ -28,8 +28,8 @@ android {
         applicationId = "com.sliderulewatchguide"
         minSdk = 30
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.0.5"
+        versionCode = 15
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -107,6 +107,13 @@ android {
 }
 
 dependencies {
+    // play-services-wearable transitively pulls androidx.fragment 1.1.0
+    // (2019), which Google Play flags as an outdated SDK — constrain it
+    // up to current stable (no direct fragment usage in this module).
+    constraints {
+        implementation("androidx.fragment:fragment:1.8.9")
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)

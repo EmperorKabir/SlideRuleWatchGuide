@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resource-shrinker keep rules. android_wear_capabilities is read BY NAME
+     at runtime by Google Play services (Wearable Data Layer capability
+     discovery) — no code references it, so without this rule
+     isShrinkResources strips it from release builds and phone<->watch
+     sync silently dies (release-only; debug builds are unaffected). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@array/android_wear_capabilities" />
